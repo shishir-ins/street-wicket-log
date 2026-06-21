@@ -1,0 +1,835 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { AppShell } from "@/components/AppShell";
+import {
+  computeBatting, computeBowling, computeFielding,
+  computeInningsTotals, buildOverTimeline, oversString, runRate, requiredRunRate, playerMatchScore,
+  type Ball, type Player, type Match, type MatchState, type Team,
+} from "@/lib/cricket";
+import {
+  ArrowLeft, Undo2, Pause, Play, Award, Activity,
+} from "lucide-react";
+
+export const Route = createFileRoute("/matches/$id")({
+  head: () => ({
+    meta: [
+      { title: "Live Match — BELLAMLABIDI" },
+      { name: "description", content: "Ball-by-ball cricket scoring with full live scorecard." },
+    ],
+  }),
+  component: MatchPage,
+});
+
+function MatchPage() {
+  const { id } = Route.useParams();
+  const qc = useQueryClient();
+
+  const matchQ = useQuery({
+    queryKey: ["match", id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("matches").select("*").eq("id", id).single();
+      if (error) throw error;
+      return data as Match;
+    },
+  });
+  const ballsQ = useQuery({
+    queryKey: ["balls", id],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("balls").select("*").eq("match_id", id).order("ball_index");
+      if (error) throw error;
+      return data as Ball[];
+    },
+  });
+  const playersQ = useQuery({
+    queryKey: ["players"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("players").select("*").order("name");
+      if (error) throw error;
+      return data as Player[];
+    },
+  });
+
+  // poll for live matches so other devices see updates
+  useEffect(() => {
+    const m = matchQ.data;
+    if (!m || m.status === "completed") return;
+    const interval = setInterval(() => {
+      qc.invalidateQueries({ queryKey: ["match", id] });
+      qc.invalidateQueries({ queryKey: ["balls", id] });
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [matchQ.data, id, qc]);
+
+  if (matchQ.isLoading || playersQ.isLoading) return <AppShell><p className="font-chalk">Loading…</p></AppShell>;
+  if (!matchQ.data) return <AppShell><p className="font-chalk">Match not found.</p></AppShell>;
+
+  const match = matchQ.data;
+  const balls = ballsQ.data ?? [];
+  const players = playersQ.data ?? [];
+  const byId: Record<string, Player> = Object.fromEntries(players.map((p) => [p.id, p]));
+
+  if (match.status === "completed") {
+    return <FinalScorecard match={match} balls={balls} byId={byId} />;
+  }
+  return <LiveScoring match={match} balls={balls} byId={byId} players={players} />;
+}
+
+// ---------- LIVE SCORING ----------
+
+function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Ball[]; byId: Record<string, Player>; players: Player[] }) {
+  const qc = useQueryClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const state = match.state as any as MatchState;
+  const totalBalls = match.total_overs * 6;
+  const innings = state.innings;
+
+  const inningsBalls = balls.filter((b) => b.innings_number === innings);
+  const totals = computeInningsTotals(balls, innings);
+  const lastOverBalls = inningsBalls.filter((b) => b.over_number === Math.floor(totals.legalBalls / 6) || (b.over_number === Math.floor(totals.legalBalls / 6) - 1 && totals.legalBalls % 6 === 0)).slice(-12);
+  const ballsInCurrentOver = inningsBalls.filter((b) => b.is_legal_ball).slice(-((totals.legalBalls % 6) || 6));
+  void ballsInCurrentOver;
+
+  const battingPlayers = (state.battingTeam === "A" ? match.team_a_players : match.team_b_players) as unknown as string[];
+  const bowlingPlayers = (state.bowlingTeam === "A" ? match.team_a_players : match.team_b_players) as unknown as string[];
+  const battingTeamWithCommon = match.common_player_id ? [...battingPlayers, match.common_player_id] : battingPlayers;
+  const bowlingTeamWithCommon = match.common_player_id ? [...bowlingPlayers, match.common_player_id] : bowlingPlayers;
+  const battingTeamName = state.battingTeam === "A" ? match.team_a_name : match.team_b_name;
+  const bowlingTeamName = state.bowlingTeam === "A" ? match.team_a_name : match.team_b_name;
+  const battingTeamSize = battingTeamWithCommon.length;
+
+  const batting = computeBatting(balls);
+  const bowling = computeBowling(balls);
+
+  const striker = state.strikerId ? byId[state.strikerId] : undefined;
+  const nonStriker = state.nonStrikerId ? byId[state.nonStrikerId] : undefined;
+  const bowler = state.bowlerId ? byId[state.bowlerId] : undefined;
+
+  const sBat = state.strikerId ? batting[state.strikerId] : undefined;
+  const nBat = state.nonStrikerId ? batting[state.nonStrikerId] : undefined;
+  const bBow = state.bowlerId ? bowling[state.bowlerId] : undefined;
+
+  // Modifiers and dialogs
+  const [extraMod, setExtraMod] = useState<"wide" | "no_ball" | "bye" | "leg_bye" | null>(null);
+  const [wicketDialog, setWicketDialog] = useState(false);
+  const [pendingNextBowler, setPendingNextBowler] = useState(false);
+  const [pendingNewBatsman, setPendingNewBatsman] = useState<{ runs: number } | null>(null);
+  const [inningsBreakDialog, setInningsBreakDialog] = useState(false);
+  const [target, setTarget] = useState<number | null>(state.target ?? null);
+
+  // Detect target from completed innings 1
+  useEffect(() => {
+    if (innings === 2 && state.target == null) {
+      const i1 = computeInningsTotals(balls, 1);
+      if (i1.legalBalls > 0) setTarget(i1.runs + 1);
+    } else {
+      setTarget(state.target ?? null);
+    }
+  }, [innings, state.target, balls]);
+
+  // Persist a new ball + update state
+  const recordBall = useMutation({
+    mutationFn: async (payload: {
+      runs: number;
+      extraType?: "wide" | "no_ball" | "bye" | "leg_bye" | null;
+      isWicket?: boolean;
+      wicketType?: string;
+      outPlayerId?: string;
+      fielderId?: string;
+    }) => {
+      const isLegal = !(payload.extraType === "wide" || payload.extraType === "no_ball");
+      const extraRuns =
+        payload.extraType === "wide" || payload.extraType === "no_ball"
+          ? 1 + (payload.extraType === "wide" ? payload.runs : 0)
+          : payload.extraType === "bye" || payload.extraType === "leg_bye"
+            ? payload.runs
+            : 0;
+      const batRuns =
+        payload.extraType === "wide" || payload.extraType === "bye" || payload.extraType === "leg_bye"
+          ? 0
+          : payload.runs;
+
+      const overNumber = Math.floor(totals.legalBalls / 6);
+      const ballInOver = (totals.legalBalls % 6) + (isLegal ? 1 : 0);
+      const ballIndex = (state.ballIndex ?? 0) + 1;
+
+      // Insert ball
+      const { error: berr } = await supabase.from("balls").insert({
+        match_id: match.id,
+        innings_number: innings,
+        ball_index: ballIndex,
+        over_number: overNumber,
+        ball_in_over: ballInOver,
+        bowler_id: state.bowlerId,
+        striker_id: state.strikerId,
+        non_striker_id: state.nonStrikerId,
+        runs: batRuns,
+        extra_type: payload.extraType ?? null,
+        extra_runs: extraRuns,
+        is_legal_ball: isLegal,
+        is_wicket: !!payload.isWicket,
+        wicket_type: payload.wicketType ?? null,
+        out_player_id: payload.outPlayerId ?? null,
+        fielder_id: payload.fielderId ?? null,
+        batting_team: state.battingTeam,
+      });
+      if (berr) throw berr;
+
+      // Compute new state (after this ball)
+      const newLegalBalls = totals.legalBalls + (isLegal ? 1 : 0);
+      const newWickets = totals.wickets + (payload.isWicket ? 1 : 0);
+      const totalRunsThisBall = batRuns + extraRuns;
+
+      // Strike swap on odd run counts (bat or bye/leg-bye); wide adds no strike-altering run except via extras taken
+      let newStrikerId = state.strikerId;
+      let newNonStrikerId = state.nonStrikerId;
+      const runsForStrikeSwap = batRuns + (payload.extraType === "bye" || payload.extraType === "leg_bye" ? payload.runs : 0);
+      if (runsForStrikeSwap % 2 === 1) {
+        [newStrikerId, newNonStrikerId] = [newNonStrikerId, newStrikerId];
+      }
+
+      // End of over — swap strike + need new bowler
+      const overEnded = isLegal && newLegalBalls % 6 === 0 && newLegalBalls > 0;
+      if (overEnded) {
+        [newStrikerId, newNonStrikerId] = [newNonStrikerId, newStrikerId];
+      }
+
+      // Wicket → need new batsman (unless innings ends)
+      const outBatsmen = [...(state.outBatsmen ?? [])];
+      if (payload.isWicket && payload.outPlayerId) outBatsmen.push(payload.outPlayerId);
+
+      const allOut = newWickets >= battingTeamSize - 1;
+      const oversComplete = newLegalBalls >= totalBalls;
+      const chasedDown = innings === 2 && target != null && (totals.runs + totalRunsThisBall) >= target;
+      const inningsOver = allOut || oversComplete || chasedDown;
+
+      // Build new state without striker swap if we need new batsman
+      const nextState: MatchState = {
+        ...state,
+        ballIndex,
+        outBatsmen,
+        strikerId: newStrikerId,
+        nonStrikerId: newNonStrikerId,
+      };
+
+      // If batter is out — they leave field; mark slot empty, dialog will set new batsman
+      if (payload.isWicket && payload.outPlayerId) {
+        if (payload.outPlayerId === state.strikerId) nextState.strikerId = null;
+        else if (payload.outPlayerId === state.nonStrikerId) nextState.nonStrikerId = null;
+        else {
+          // running between wickets out — could be either; treat as striker out by default
+          nextState.strikerId = null;
+        }
+      }
+
+      // Persist
+      let newStatus = match.status;
+      if (inningsOver) {
+        if (innings === 1) {
+          nextState.target = totals.runs + totalRunsThisBall + 1;
+          newStatus = "innings_break";
+        } else {
+          newStatus = "completed";
+        }
+      }
+
+      const { error: merr } = await supabase.from("matches")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .update({ state: nextState as any, status: newStatus })
+        .eq("id", match.id);
+      if (merr) throw merr;
+
+      return { overEnded, inningsOver, needNewBatsman: !!payload.isWicket && !inningsOver };
+    },
+    onSuccess: async (r) => {
+      setExtraMod(null);
+      await qc.invalidateQueries({ queryKey: ["match", match.id] });
+      await qc.invalidateQueries({ queryKey: ["balls", match.id] });
+      if (r?.inningsOver) {
+        setInningsBreakDialog(true);
+      } else {
+        if (r?.needNewBatsman) setPendingNewBatsman({ runs: 0 });
+        if (r?.overEnded) setPendingNextBowler(true);
+      }
+    },
+  });
+
+  const undoLast = useMutation({
+    mutationFn: async () => {
+      const last = [...balls].sort((a, b) => b.ball_index - a.ball_index)[0];
+      if (!last) return;
+      // Restore previous state
+      const { error: derr } = await supabase.from("balls").delete().eq("id", last.id);
+      if (derr) throw derr;
+      // Re-derive striker/non-striker/bowler from previous state — best effort:
+      // Easiest: set state to use last ball's striker/non-striker/bowler and previous innings if needed
+      const prev: MatchState = {
+        ...state,
+        strikerId: last.striker_id,
+        nonStrikerId: last.non_striker_id,
+        bowlerId: last.bowler_id,
+        ballIndex: Math.max(0, (state.ballIndex ?? 0) - 1),
+        innings: last.innings_number as 1 | 2,
+        battingTeam: last.batting_team as Team,
+        bowlingTeam: (last.batting_team === "A" ? "B" : "A") as Team,
+        outBatsmen: (state.outBatsmen ?? []).filter((x) => x !== last.out_player_id),
+      };
+      const { error: merr } = await supabase.from("matches")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .update({ state: prev as any, status: "live" }).eq("id", match.id);
+      if (merr) throw merr;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["match", match.id] });
+      qc.invalidateQueries({ queryKey: ["balls", match.id] });
+    },
+  });
+
+  const setStateMut = useMutation({
+    mutationFn: async (next: Partial<MatchState> & { status?: string }) => {
+      const { status, ...rest } = next;
+      const merged = { ...state, ...rest };
+      const update: { state: unknown; status?: string } = { state: merged };
+      if (status) update.status = status;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await supabase.from("matches").update(update as any).eq("id", match.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["match", match.id] });
+    },
+  });
+
+  // Score click handler
+  const onRun = (n: number) => {
+    recordBall.mutate({ runs: n, extraType: extraMod ?? null });
+  };
+
+  const togglePause = () => {
+    const next = match.status === "match_break" ? "live" : "match_break";
+    setStateMut.mutate({ status: next });
+  };
+
+  const overTimeline = useMemo(() => buildOverTimeline(balls, innings), [balls, innings]);
+  const currentOver = overTimeline[overTimeline.length - 1];
+  const prevOver = overTimeline[overTimeline.length - 2];
+
+  const rr = runRate(totals.runs, totals.legalBalls);
+  const rrr = innings === 2 && target ? requiredRunRate(target, totals.runs, totalBalls, totals.legalBalls) : null;
+  const battingTeamSizeForUI = battingTeamSize;
+
+  const isPaused = match.status === "match_break";
+  const isInningsBreak = match.status === "innings_break";
+  const needsBatsman = !state.strikerId || !state.nonStrikerId;
+
+  return (
+    <AppShell>
+      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <Link to="/matches" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="h-4 w-4" /> Matches
+        </Link>
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1 text-xs font-display tracking-widest text-destructive">
+            <span className="h-2 w-2 rounded-full bg-destructive animate-pulse" /> {match.status.toUpperCase().replace("_"," ")}
+          </span>
+          <button onClick={togglePause} className="btn-chalk rounded-md px-3 py-1.5 text-xs inline-flex items-center gap-1">
+            {isPaused ? <><Play className="h-3.5 w-3.5"/>Resume</> : <><Pause className="h-3.5 w-3.5"/>Break</>}
+          </button>
+        </div>
+      </div>
+
+      {/* Score header */}
+      <div className="chalk-board p-5 sm:p-7 mb-4">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <div className="font-display tracking-widest text-muted-foreground text-sm">{battingTeamName} — Innings {innings}</div>
+            <div className="flex items-baseline gap-2 mt-1">
+              <span className="score-tile text-6xl sm:text-7xl text-primary">{totals.runs}</span>
+              <span className="score-tile text-3xl text-muted-foreground">/{totals.wickets}</span>
+            </div>
+            <div className="font-chalk text-lg text-chalk-dim" style={{ color: "var(--chalk-dim)" }}>
+              {oversString(totals.legalBalls)} / {match.total_overs} overs · CRR {rr.toFixed(2)}
+              {rrr !== null && <> · RRR {rrr.toFixed(2)}</>}
+            </div>
+          </div>
+          {target && innings === 2 && (
+            <div className="text-right">
+              <div className="text-xs font-display tracking-widest text-muted-foreground">TARGET</div>
+              <div className="score-tile text-4xl text-accent">{target}</div>
+              <div className="text-xs text-muted-foreground mt-1">
+                Need {Math.max(0, target - totals.runs)} off {Math.max(0, totalBalls - totals.legalBalls)} balls
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Batsmen + Bowler */}
+      <div className="grid md:grid-cols-3 gap-3 mb-4">
+        <BatsmanCard label="Striker*" player={striker} line={sBat} />
+        <BatsmanCard label="Non-striker" player={nonStriker} line={nBat} />
+        <div className="chalk-board p-4">
+          <div className="text-xs font-display tracking-wider text-muted-foreground">BOWLER</div>
+          <div className="font-display text-2xl tracking-wide mt-0.5">{bowler?.name ?? "—"}</div>
+          <div className="text-sm text-muted-foreground mt-1 font-chalk">
+            {bBow ? `${Math.floor(bBow.legalBalls/6)}.${bBow.legalBalls%6}-${bBow.maidens}-${bBow.runsConceded}-${bBow.wickets} · Eco ${bBow.economy.toFixed(2)}` : "—"}
+          </div>
+        </div>
+      </div>
+
+      {/* Over timeline */}
+      <div className="chalk-board p-4 mb-4">
+        <div className="flex items-center gap-2 mb-2 text-xs font-display tracking-wider text-muted-foreground">
+          <Activity className="h-3.5 w-3.5" /> THIS OVER
+        </div>
+        <div className="flex flex-wrap gap-2 min-h-[2.5rem]">
+          {(currentOver?.balls ?? []).map((b, i) => <BallPill key={`c-${i}`} label={b.label} wicket={b.isWicket} />)}
+          {(currentOver?.balls ?? []).length === 0 && <span className="font-chalk text-muted-foreground">No balls yet.</span>}
+        </div>
+        {prevOver && (
+          <>
+            <div className="text-xs text-muted-foreground mt-3 font-display tracking-wider">PREVIOUS OVER</div>
+            <div className="flex flex-wrap gap-2 mt-1">
+              {prevOver.balls.map((b, i) => <BallPill key={`p-${i}`} label={b.label} wicket={b.isWicket} dim />)}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Scoring grid */}
+      {!isInningsBreak && !needsBatsman && !pendingNextBowler && (
+        <div className="chalk-board p-4 mb-4">
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+            {[0,1,2,3,4,6].map((n) => (
+              <button key={n} disabled={isPaused || recordBall.isPending} onClick={() => onRun(n)}
+                className={`btn-chalk rounded-md py-5 text-2xl ${n===4 ? "bg-accent/20 text-accent" : ""} ${n===6 ? "bg-primary/20 text-primary" : ""}`}>
+                {n}
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-3">
+            {([
+              ["wide","Wide"],["no_ball","No Ball"],["bye","Bye"],["leg_bye","Leg Bye"],
+            ] as const).map(([key, label]) => (
+              <button key={key} disabled={isPaused || recordBall.isPending}
+                onClick={() => setExtraMod(extraMod === key ? null : key)}
+                className={`btn-chalk rounded-md py-3 text-sm ${extraMod===key ? "bg-accent/30 text-accent border-accent/60" : ""}`}>
+                {label}{extraMod === key ? " ✓" : ""}
+              </button>
+            ))}
+            <button disabled={isPaused || recordBall.isPending} onClick={() => setWicketDialog(true)}
+              className="btn-chalk rounded-md py-3 text-sm bg-destructive/20 text-destructive border-destructive/40">
+              WICKET
+            </button>
+          </div>
+          {extraMod && (
+            <p className="text-xs text-muted-foreground mt-2 font-chalk">
+              Next number will be recorded as <span className="text-accent">{extraMod.replace("_"," ")}</span> + runs taken (tap 0 for just an extra).
+            </p>
+          )}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button onClick={() => undoLast.mutate()} disabled={undoLast.isPending || balls.length===0}
+              className="btn-chalk rounded-md px-3 py-2 text-sm inline-flex items-center gap-1">
+              <Undo2 className="h-3.5 w-3.5" /> Undo last ball
+            </button>
+            <button onClick={() => setExtraMod(null)} disabled={!extraMod}
+              className="btn-chalk rounded-md px-3 py-2 text-sm">Clear extra</button>
+          </div>
+          {recordBall.error ? <p className="text-destructive text-sm mt-2">{(recordBall.error as Error).message}</p> : null}
+        </div>
+      )}
+
+      {/* In-innings dialogs */}
+      {wicketDialog && (
+        <WicketDialog
+          onClose={() => setWicketDialog(false)}
+          onSubmit={(d) => {
+            setWicketDialog(false);
+            recordBall.mutate({
+              runs: d.runs,
+              extraType: extraMod ?? null,
+              isWicket: true,
+              wicketType: d.type,
+              outPlayerId: d.outPlayerId,
+              fielderId: d.fielderId || undefined,
+            });
+          }}
+          striker={striker} nonStriker={nonStriker}
+          fielders={bowlingTeamWithCommon.map((id) => byId[id]).filter(Boolean) as Player[]}
+        />
+      )}
+
+      {(pendingNewBatsman || needsBatsman) && !isInningsBreak && (
+        <NewBatsmanDialog
+          availableIds={battingTeamWithCommon.filter((pid) =>
+            pid !== state.strikerId && pid !== state.nonStrikerId &&
+            !(state.outBatsmen ?? []).includes(pid),
+          )}
+          byId={byId}
+          onPick={(pid) => {
+            const next: Partial<MatchState> = {};
+            if (!state.strikerId) next.strikerId = pid;
+            else if (!state.nonStrikerId) next.nonStrikerId = pid;
+            setStateMut.mutate(next);
+            setPendingNewBatsman(null);
+          }}
+        />
+      )}
+
+      {pendingNextBowler && (
+        <NextBowlerDialog
+          availableIds={bowlingTeamWithCommon.filter((pid) => pid !== state.bowlerId)}
+          byId={byId}
+          onPick={(pid) => { setStateMut.mutate({ bowlerId: pid }); setPendingNextBowler(false); }}
+          onSame={() => setPendingNextBowler(false)}
+        />
+      )}
+
+      {(isInningsBreak || inningsBreakDialog) && innings === 1 && (
+        <InningsBreakDialog
+          target={state.target ?? totals.runs + 1}
+          nextBattingTeamName={bowlingTeamName}
+          battingIds={bowlingTeamWithCommon}
+          bowlingIds={battingTeamWithCommon}
+          byId={byId}
+          onStart={(picks) => {
+            const newState: MatchState = {
+              ...state,
+              innings: 2,
+              battingTeam: state.bowlingTeam,
+              bowlingTeam: state.battingTeam,
+              strikerId: picks.strikerId,
+              nonStrikerId: picks.nonStrikerId,
+              bowlerId: picks.bowlerId,
+              outBatsmen: [],
+            };
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            supabase.from("matches").update({ state: newState as any, status: "live" }).eq("id", match.id).then(() => {
+              setInningsBreakDialog(false);
+              qc.invalidateQueries({ queryKey: ["match", match.id] });
+            });
+          }}
+        />
+      )}
+
+      {/* Mini scorecards */}
+      <ScorecardBlock title={`${battingTeamName} batting`} ids={battingTeamWithCommon} byId={byId} balls={inningsBalls} mode="bat" />
+      <ScorecardBlock title={`${bowlingTeamName} bowling`} ids={bowlingTeamWithCommon} byId={byId} balls={inningsBalls} mode="bowl" />
+
+      <p className="text-xs text-muted-foreground mt-6">Team size: {battingTeamSizeForUI}. Saves automatically with every ball.</p>
+    </AppShell>
+  );
+}
+
+function BatsmanCard({ label, player, line }: { label: string; player?: Player; line?: { runs: number; ballsFaced: number; fours: number; sixes: number; strikeRate: number } }) {
+  return (
+    <div className="chalk-board p-4">
+      <div className="text-xs font-display tracking-wider text-muted-foreground">{label.toUpperCase()}</div>
+      <div className="font-display text-2xl tracking-wide mt-0.5">{player?.name ?? "—"}</div>
+      <div className="text-sm text-muted-foreground mt-1 font-chalk">
+        {line ? `${line.runs} (${line.ballsFaced})  ·  SR ${line.strikeRate.toFixed(1)}  ·  ${line.fours}×4 ${line.sixes}×6` : "0 (0)"}
+      </div>
+    </div>
+  );
+}
+
+function BallPill({ label, wicket, dim }: { label: string; wicket?: boolean; dim?: boolean }) {
+  const color = wicket ? "bg-destructive/30 text-destructive border-destructive/40"
+    : label === "4" ? "bg-accent/30 text-accent border-accent/50"
+    : label === "6" ? "bg-primary/30 text-primary border-primary/50"
+    : "bg-secondary text-foreground border-border";
+  return <span className={`px-2.5 py-1 rounded-md border text-sm font-display tracking-wide ${color} ${dim ? "opacity-60" : ""}`}>{label}</span>;
+}
+
+function ScorecardBlock({ title, ids, byId, balls, mode }: { title: string; ids: string[]; byId: Record<string, Player>; balls: Ball[]; mode: "bat" | "bowl" }) {
+  const bat = computeBatting(balls);
+  const bow = computeBowling(balls);
+  return (
+    <div className="chalk-board p-4 mt-4">
+      <h3 className="font-display tracking-widest mb-3">{title}</h3>
+      {mode === "bat" ? (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="text-xs text-muted-foreground font-display tracking-wider">
+              <tr><th className="text-left py-1">Player</th><th>R</th><th>B</th><th>4s</th><th>6s</th><th>SR</th><th className="text-right">Status</th></tr>
+            </thead>
+            <tbody>
+              {ids.map((id) => {
+                const l = bat[id];
+                if (!l) return null;
+                return (
+                  <tr key={id} className="border-t border-border/30">
+                    <td className="py-1.5">{byId[id]?.name ?? "?"}</td>
+                    <td className="text-center font-medium">{l.runs}</td>
+                    <td className="text-center text-muted-foreground">{l.ballsFaced}</td>
+                    <td className="text-center text-muted-foreground">{l.fours}</td>
+                    <td className="text-center text-muted-foreground">{l.sixes}</td>
+                    <td className="text-center text-muted-foreground">{l.strikeRate.toFixed(1)}</td>
+                    <td className="text-right text-xs text-muted-foreground">{l.out ? l.dismissal : "not out"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="text-xs text-muted-foreground font-display tracking-wider">
+              <tr><th className="text-left py-1">Bowler</th><th>O</th><th>M</th><th>R</th><th>W</th><th>Eco</th></tr>
+            </thead>
+            <tbody>
+              {ids.map((id) => {
+                const l = bow[id];
+                if (!l) return null;
+                return (
+                  <tr key={id} className="border-t border-border/30">
+                    <td className="py-1.5">{byId[id]?.name ?? "?"}</td>
+                    <td className="text-center">{Math.floor(l.legalBalls/6)}.{l.legalBalls%6}</td>
+                    <td className="text-center">{l.maidens}</td>
+                    <td className="text-center">{l.runsConceded}</td>
+                    <td className="text-center font-medium">{l.wickets}</td>
+                    <td className="text-center text-muted-foreground">{l.economy.toFixed(2)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------- DIALOGS ----------
+
+function Modal({ children, onClose, title }: { children: React.ReactNode; onClose?: () => void; title: string }) {
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+      <div className="chalk-board p-5 max-w-md w-full animate-chalk-in" onClick={(e) => e.stopPropagation()}>
+        <h3 className="font-display tracking-widest text-xl mb-3">{title}</h3>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function WicketDialog({
+  onClose, onSubmit, striker, nonStriker, fielders,
+}: {
+  onClose: () => void;
+  onSubmit: (d: { type: string; outPlayerId: string; fielderId: string; runs: number }) => void;
+  striker?: Player; nonStriker?: Player; fielders: Player[];
+}) {
+  const types = ["Bowled","Caught","LBW","Run Out","Stumped","Hit Wicket"];
+  const [type, setType] = useState("Bowled");
+  const [outId, setOutId] = useState(striker?.id ?? "");
+  const [fielderId, setFielderId] = useState("");
+  const [runs, setRuns] = useState(0);
+  const needsFielder = type === "Caught" || type === "Stumped" || type === "Run Out";
+  return (
+    <Modal title="Wicket!" onClose={onClose}>
+      <div className="space-y-3">
+        <div>
+          <label className="text-xs text-muted-foreground font-display tracking-wider">DISMISSAL</label>
+          <div className="grid grid-cols-3 gap-2 mt-1">
+            {types.map((t) => (
+              <button key={t} type="button" onClick={() => setType(t)}
+                className={`btn-chalk rounded-md py-2 text-xs ${type===t ? "bg-destructive/30 text-destructive border-destructive/50" : ""}`}>{t}</button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground font-display tracking-wider">WHO IS OUT</label>
+          <select className="w-full mt-1 bg-input/40 border border-border rounded-md px-3 py-2" value={outId} onChange={(e) => setOutId(e.target.value)}>
+            {striker && <option value={striker.id}>{striker.name} (striker)</option>}
+            {nonStriker && <option value={nonStriker.id}>{nonStriker.name} (non-striker)</option>}
+          </select>
+        </div>
+        {needsFielder && (
+          <div>
+            <label className="text-xs text-muted-foreground font-display tracking-wider">FIELDER</label>
+            <select className="w-full mt-1 bg-input/40 border border-border rounded-md px-3 py-2" value={fielderId} onChange={(e) => setFielderId(e.target.value)}>
+              <option value="">— pick fielder —</option>
+              {fielders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+            </select>
+          </div>
+        )}
+        {type === "Run Out" && (
+          <div>
+            <label className="text-xs text-muted-foreground font-display tracking-wider">RUNS COMPLETED</label>
+            <input type="number" min={0} max={6} className="w-full mt-1 bg-input/40 border border-border rounded-md px-3 py-2" value={runs} onChange={(e) => setRuns(+e.target.value || 0)} />
+          </div>
+        )}
+        <div className="flex justify-end gap-2 pt-2">
+          <button onClick={onClose} className="btn-chalk rounded-md px-4 py-2">Cancel</button>
+          <button
+            onClick={() => onSubmit({ type, outPlayerId: outId, fielderId, runs })}
+            disabled={!outId || (needsFielder && !fielderId)}
+            className="rounded-md bg-destructive text-destructive-foreground px-4 py-2 font-display tracking-wide disabled:opacity-50">
+            Record wicket
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function NewBatsmanDialog({ availableIds, byId, onPick }: { availableIds: string[]; byId: Record<string, Player>; onPick: (id: string) => void }) {
+  return (
+    <Modal title="Next batsman">
+      {availableIds.length === 0 ? (
+        <p className="font-chalk">No more batsmen available — innings will end.</p>
+      ) : (
+        <div className="grid grid-cols-2 gap-2">
+          {availableIds.map((id) => (
+            <button key={id} onClick={() => onPick(id)} className="btn-chalk rounded-md py-3 text-sm">
+              {byId[id]?.name ?? "?"}
+            </button>
+          ))}
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+function NextBowlerDialog({ availableIds, byId, onPick, onSame }: { availableIds: string[]; byId: Record<string, Player>; onPick: (id: string) => void; onSame: () => void }) {
+  return (
+    <Modal title="Next bowler">
+      <div className="grid grid-cols-2 gap-2">
+        {availableIds.map((id) => (
+          <button key={id} onClick={() => onPick(id)} className="btn-chalk rounded-md py-3 text-sm">
+            {byId[id]?.name ?? "?"}
+          </button>
+        ))}
+      </div>
+      <button onClick={onSame} className="text-xs text-muted-foreground mt-3 hover:text-foreground">Keep current bowler</button>
+    </Modal>
+  );
+}
+
+function InningsBreakDialog({
+  target, nextBattingTeamName, battingIds, bowlingIds, byId, onStart,
+}: {
+  target: number; nextBattingTeamName: string; battingIds: string[]; bowlingIds: string[]; byId: Record<string, Player>;
+  onStart: (picks: { strikerId: string; nonStrikerId: string; bowlerId: string }) => void;
+}) {
+  const [strikerId, setStrikerId] = useState("");
+  const [nonStrikerId, setNonStrikerId] = useState("");
+  const [bowlerId, setBowlerId] = useState("");
+  return (
+    <Modal title={`Innings break — ${nextBattingTeamName} needs ${target}`}>
+      <div className="space-y-3">
+        <PlayerPick label="Striker" value={strikerId} onChange={setStrikerId} ids={battingIds.filter((x) => x !== nonStrikerId)} byId={byId} />
+        <PlayerPick label="Non-striker" value={nonStrikerId} onChange={setNonStrikerId} ids={battingIds.filter((x) => x !== strikerId)} byId={byId} />
+        <PlayerPick label="Opening bowler" value={bowlerId} onChange={setBowlerId} ids={bowlingIds} byId={byId} />
+        <div className="flex justify-end">
+          <button disabled={!strikerId || !nonStrikerId || !bowlerId}
+            onClick={() => onStart({ strikerId, nonStrikerId, bowlerId })}
+            className="rounded-md bg-primary text-primary-foreground px-4 py-2 font-display tracking-wide disabled:opacity-50">
+            Start innings 2 ▶
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function PlayerPick({ label, value, onChange, ids, byId }: { label: string; value: string; onChange: (v: string) => void; ids: string[]; byId: Record<string, Player> }) {
+  return (
+    <div>
+      <label className="text-xs text-muted-foreground font-display tracking-wider">{label.toUpperCase()}</label>
+      <select className="w-full mt-1 bg-input/40 border border-border rounded-md px-3 py-2" value={value} onChange={(e) => onChange(e.target.value)}>
+        <option value="">— select —</option>
+        {ids.map((id) => <option key={id} value={id}>{byId[id]?.name ?? "?"}</option>)}
+      </select>
+    </div>
+  );
+}
+
+// ---------- FINAL SCORECARD ----------
+
+function FinalScorecard({ match, balls, byId }: { match: Match; balls: Ball[]; byId: Record<string, Player> }) {
+  const i1 = computeInningsTotals(balls, 1);
+  const i2 = computeInningsTotals(balls, 2);
+
+  const teamA_ids = (match.team_a_players as unknown as string[]) ?? [];
+  const teamB_ids = (match.team_b_players as unknown as string[]) ?? [];
+  const allWithCommon = (ids: string[]) => match.common_player_id ? [...ids, match.common_player_id] : ids;
+
+  const battingFirstTeam = match.batting_first as Team;
+  const team1Ids = allWithCommon(battingFirstTeam === "A" ? teamA_ids : teamB_ids);
+  const team2Ids = allWithCommon(battingFirstTeam === "A" ? teamB_ids : teamA_ids);
+  const team1Name = battingFirstTeam === "A" ? match.team_a_name : match.team_b_name;
+  const team2Name = battingFirstTeam === "A" ? match.team_b_name : match.team_a_name;
+
+  // Compute result
+  let resultText = "Match drawn";
+  if (i1.runs > i2.runs) {
+    resultText = `${team1Name} won by ${i1.runs - i2.runs} runs`;
+  } else if (i2.runs > i1.runs) {
+    const wktsLeft = (team2Ids.length - 1) - i2.wickets;
+    resultText = `${team2Name} won by ${wktsLeft} wickets`;
+  } else if (i1.runs > 0 || i2.runs > 0) {
+    resultText = "Match tied";
+  }
+
+  // POM
+  const batting = computeBatting(balls);
+  const bowling = computeBowling(balls);
+  const fielding = computeFielding(balls);
+  const allIds = Array.from(new Set([...team1Ids, ...team2Ids]));
+  const pom = allIds
+    .map((id) => ({ id, score: playerMatchScore(batting[id], bowling[id], fielding[id]?.catches ?? 0) }))
+    .sort((a, b) => b.score - a.score)[0];
+
+  return (
+    <AppShell>
+      <Link to="/matches" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4">
+        <ArrowLeft className="h-4 w-4" /> Matches
+      </Link>
+      <div className="chalk-board p-6 mb-4">
+        <span className="tape-tag text-xs">FULL TIME</span>
+        <h1 className="text-3xl sm:text-4xl font-display tracking-widest mt-3">{match.team_a_name} <span className="text-muted-foreground">vs</span> {match.team_b_name}</h1>
+        <p className="font-chalk text-xl text-accent mt-2">{resultText}</p>
+        <p className="text-xs text-muted-foreground mt-1">{new Date(match.match_date).toLocaleString()} · {match.total_overs} overs/side</p>
+      </div>
+
+      {pom && pom.score > 0 && (
+        <div className="chalk-board p-5 mb-4 flex items-center gap-4">
+          <Award className="h-10 w-10 text-accent shrink-0" />
+          <div>
+            <div className="text-xs font-display tracking-widest text-muted-foreground">PLAYER OF THE MATCH</div>
+            <Link to="/players/$id" params={{ id: pom.id }} className="text-2xl font-display tracking-wide hover:text-primary">
+              {byId[pom.id]?.name ?? "—"}
+            </Link>
+          </div>
+        </div>
+      )}
+
+      <div className="grid md:grid-cols-2 gap-4">
+        <InningsCard label={`${team1Name} — Innings 1`} totals={i1} overs={match.total_overs} />
+        <InningsCard label={`${team2Name} — Innings 2`} totals={i2} overs={match.total_overs} />
+      </div>
+
+      <ScorecardBlock title={`${team1Name} batting`} ids={team1Ids} byId={byId} balls={balls.filter((b) => b.innings_number === 1)} mode="bat" />
+      <ScorecardBlock title={`${team2Name} bowling`} ids={team2Ids} byId={byId} balls={balls.filter((b) => b.innings_number === 1)} mode="bowl" />
+      <ScorecardBlock title={`${team2Name} batting`} ids={team2Ids} byId={byId} balls={balls.filter((b) => b.innings_number === 2)} mode="bat" />
+      <ScorecardBlock title={`${team1Name} bowling`} ids={team1Ids} byId={byId} balls={balls.filter((b) => b.innings_number === 2)} mode="bowl" />
+    </AppShell>
+  );
+}
+
+function InningsCard({ label, totals, overs }: { label: string; totals: ReturnType<typeof computeInningsTotals>; overs: number }) {
+  return (
+    <div className="chalk-board p-4">
+      <div className="text-xs font-display tracking-wider text-muted-foreground">{label.toUpperCase()}</div>
+      <div className="flex items-baseline gap-2 mt-1">
+        <span className="score-tile text-4xl text-primary">{totals.runs}</span>
+        <span className="score-tile text-xl text-muted-foreground">/{totals.wickets}</span>
+      </div>
+      <div className="text-xs text-muted-foreground mt-1">{oversString(totals.legalBalls)} / {overs} overs · {totals.fours}×4 {totals.sixes}×6 · Extras {totals.extras}</div>
+    </div>
+  );
+}
