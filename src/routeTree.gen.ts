@@ -9,38 +9,138 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as PlayersRouteImport } from './routes/players'
+import { Route as MatchesRouteImport } from './routes/matches'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PlayersIdRouteImport } from './routes/players.$id'
+import { Route as MatchesNewRouteImport } from './routes/matches.new'
+import { Route as MatchesIdRouteImport } from './routes/matches.$id'
 
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlayersRoute = PlayersRouteImport.update({
+  id: '/players',
+  path: '/players',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MatchesRoute = MatchesRouteImport.update({
+  id: '/matches',
+  path: '/matches',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PlayersIdRoute = PlayersIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => PlayersRoute,
+} as any)
+const MatchesNewRoute = MatchesNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => MatchesRoute,
+} as any)
+const MatchesIdRoute = MatchesIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => MatchesRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/matches': typeof MatchesRouteWithChildren
+  '/players': typeof PlayersRouteWithChildren
+  '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/matches/$id': typeof MatchesIdRoute
+  '/matches/new': typeof MatchesNewRoute
+  '/players/$id': typeof PlayersIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/matches': typeof MatchesRouteWithChildren
+  '/players': typeof PlayersRouteWithChildren
+  '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/matches/$id': typeof MatchesIdRoute
+  '/matches/new': typeof MatchesNewRoute
+  '/players/$id': typeof PlayersIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/matches': typeof MatchesRouteWithChildren
+  '/players': typeof PlayersRouteWithChildren
+  '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/matches/$id': typeof MatchesIdRoute
+  '/matches/new': typeof MatchesNewRoute
+  '/players/$id': typeof PlayersIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/matches'
+    | '/players'
+    | '/sitemap.xml'
+    | '/matches/$id'
+    | '/matches/new'
+    | '/players/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/matches'
+    | '/players'
+    | '/sitemap.xml'
+    | '/matches/$id'
+    | '/matches/new'
+    | '/players/$id'
+  id:
+    | '__root__'
+    | '/'
+    | '/matches'
+    | '/players'
+    | '/sitemap.xml'
+    | '/matches/$id'
+    | '/matches/new'
+    | '/players/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  MatchesRoute: typeof MatchesRouteWithChildren
+  PlayersRoute: typeof PlayersRouteWithChildren
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/players': {
+      id: '/players'
+      path: '/players'
+      fullPath: '/players'
+      preLoaderRoute: typeof PlayersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/matches': {
+      id: '/matches'
+      path: '/matches'
+      fullPath: '/matches'
+      preLoaderRoute: typeof MatchesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,22 +148,60 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/players/$id': {
+      id: '/players/$id'
+      path: '/$id'
+      fullPath: '/players/$id'
+      preLoaderRoute: typeof PlayersIdRouteImport
+      parentRoute: typeof PlayersRoute
+    }
+    '/matches/new': {
+      id: '/matches/new'
+      path: '/new'
+      fullPath: '/matches/new'
+      preLoaderRoute: typeof MatchesNewRouteImport
+      parentRoute: typeof MatchesRoute
+    }
+    '/matches/$id': {
+      id: '/matches/$id'
+      path: '/$id'
+      fullPath: '/matches/$id'
+      preLoaderRoute: typeof MatchesIdRouteImport
+      parentRoute: typeof MatchesRoute
+    }
   }
 }
 
+interface MatchesRouteChildren {
+  MatchesIdRoute: typeof MatchesIdRoute
+  MatchesNewRoute: typeof MatchesNewRoute
+}
+
+const MatchesRouteChildren: MatchesRouteChildren = {
+  MatchesIdRoute: MatchesIdRoute,
+  MatchesNewRoute: MatchesNewRoute,
+}
+
+const MatchesRouteWithChildren =
+  MatchesRoute._addFileChildren(MatchesRouteChildren)
+
+interface PlayersRouteChildren {
+  PlayersIdRoute: typeof PlayersIdRoute
+}
+
+const PlayersRouteChildren: PlayersRouteChildren = {
+  PlayersIdRoute: PlayersIdRoute,
+}
+
+const PlayersRouteWithChildren =
+  PlayersRoute._addFileChildren(PlayersRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  MatchesRoute: MatchesRouteWithChildren,
+  PlayersRoute: PlayersRouteWithChildren,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
