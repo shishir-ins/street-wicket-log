@@ -72,7 +72,8 @@ function NewMatch() {
         total_overs: overs,
         batting_first: battingFirst,
         status: "live",
-        state: state as unknown as Record<string, unknown>,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        state: state as any,
       }).select("id").single();
       if (error) throw error;
       return data.id as string;
