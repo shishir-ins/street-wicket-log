@@ -6,10 +6,11 @@ import { AppShell } from "@/components/AppShell";
 import {
   computeBatting, computeBowling, computeFielding,
   computeInningsTotals, buildOverTimeline, oversString, runRate, requiredRunRate, playerMatchScore,
+  commentaryFor, computePartnerships,
   type Ball, type Player, type Match, type MatchState, type Team,
 } from "@/lib/cricket";
 import {
-  ArrowLeft, Undo2, Pause, Play, Award, Activity,
+  ArrowLeft, Undo2, Pause, Play, Award, Activity, Share2, FileDown, MessageSquare, Users,
 } from "lucide-react";
 
 export const Route = createFileRoute("/matches/$id")({
@@ -154,6 +155,22 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
       const ballInOver = (totals.legalBalls % 6) + (isLegal ? 1 : 0);
       const ballIndex = (state.ballIndex ?? 0) + 1;
 
+      const commentary = commentaryFor(
+        {
+          runs: batRuns,
+          extra_type: payload.extraType ?? null,
+          extra_runs: extraRuns,
+          is_wicket: !!payload.isWicket,
+          wicket_type: payload.wicketType ?? null,
+        },
+        {
+          striker: state.strikerId ? byId[state.strikerId]?.name : undefined,
+          bowler: state.bowlerId ? byId[state.bowlerId]?.name : undefined,
+          outPlayer: payload.outPlayerId ? byId[payload.outPlayerId]?.name : undefined,
+          fielder: payload.fielderId ? byId[payload.fielderId]?.name : undefined,
+        },
+      );
+
       // Insert ball
       const { error: berr } = await supabase.from("balls").insert({
         match_id: match.id,
@@ -173,6 +190,7 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
         out_player_id: payload.outPlayerId ?? null,
         fielder_id: payload.fielderId ?? null,
         batting_team: state.battingTeam,
+        commentary,
       });
       if (berr) throw berr;
 
