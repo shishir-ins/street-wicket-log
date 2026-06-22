@@ -131,12 +131,12 @@ export function computeBowling(balls: Ball[]): Record<string, BowlingLine> {
     return map[id];
   };
   // group overs to compute maidens
-  const overGroups: Record<string, { runs: number; legal: number }> = {};
+  const overGroups: Record<string, { runs: number; legal: number; bowlerId: string }> = {};
   for (const b of balls) {
     if (!b.bowler_id) continue;
     const bl = ensure(b.bowler_id);
-    const key = `${b.bowler_id}-${b.innings_number}-${b.over_number}`;
-    overGroups[key] ??= { runs: 0, legal: 0 };
+    const key = `${b.bowler_id}|${b.innings_number}|${b.over_number}`;
+    overGroups[key] ??= { runs: 0, legal: 0, bowlerId: b.bowler_id };
     if (b.is_legal_ball) bl.legalBalls += 1;
     // Concede runs: bat runs always + wide/no_ball penalties; byes/leg byes NOT charged to bowler
     const conceded =
@@ -151,8 +151,8 @@ export function computeBowling(balls: Ball[]): Record<string, BowlingLine> {
   for (const k of Object.keys(overGroups)) {
     const g = overGroups[k];
     if (g.legal === 6 && g.runs === 0) {
-      const bowlerId = k.split("-")[0];
-      map[bowlerId].maidens += 1;
+      const line = map[g.bowlerId];
+      if (line) line.maidens += 1;
     }
   }
   for (const k of Object.keys(map)) {

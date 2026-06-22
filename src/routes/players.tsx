@@ -113,9 +113,13 @@ function PlayersPage() {
         {list.map((p) => (
           <div key={p.id} className="chalk-board p-4 flex items-center gap-3 group">
             <Link to="/players/$id" params={{ id: p.id }} className="flex items-center gap-3 flex-1 min-w-0">
-              <span className="h-12 w-12 rounded-full bg-primary/15 border border-primary/30 text-primary flex items-center justify-center font-display text-lg shrink-0">
-                {p.name.slice(0, 2).toUpperCase()}
-              </span>
+              {p.photo_url ? (
+                <img src={p.photo_url} alt={p.name} className="h-12 w-12 rounded-full object-cover border border-primary/30 shrink-0" />
+              ) : (
+                <span className="h-12 w-12 rounded-full bg-primary/15 border border-primary/30 text-primary flex items-center justify-center font-display text-lg shrink-0">
+                  {p.name.slice(0, 2).toUpperCase()}
+                </span>
+              )}
               <div className="min-w-0">
                 <div className="font-display text-lg tracking-wide truncate">{p.name}</div>
                 <div className="text-xs text-muted-foreground">{p.role}</div>
