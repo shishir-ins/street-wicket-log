@@ -211,3 +211,79 @@ export function playerMatchScore(b: BattingLine | undefined, bw: BowlingLine | u
   const srBoost = b && b.ballsFaced >= 6 ? Math.max(0, (sr - 100) / 10) : 0;
   return runs + wkts * 20 + c * 10 + ecoBoost + srBoost;
 }
+
+// ---------- Commentary ----------
+export function commentaryFor(
+  ball: {
+    runs: number;
+    extra_type: string | null;
+    extra_runs: number;
+    is_wicket: boolean;
+    wicket_type?: string | null;
+  },
+  names: { striker?: string; bowler?: string; outPlayer?: string; fielder?: string },
+): string {
+  const s = names.striker ?? "Batter";
+  const b = names.bowler ?? "Bowler";
+  if (ball.is_wicket) {
+    const who = names.outPlayer ?? s;
+    const wt = ball.wicket_type ?? "OUT";
+    if (wt === "Caught" && names.fielder) return `OUT! ${who} caught by ${names.fielder} off ${b}. What a moment!`;
+    if (wt === "Run Out") return `RUN OUT! ${who} short of the crease${names.fielder ? `, ${names.fielder} with the throw` : ""}.`;
+    if (wt === "Bowled") return `BOWLED! ${b} cleans up ${who}. Timber!`;
+    if (wt === "LBW") return `LBW! ${b} traps ${who} plumb in front.`;
+    if (wt === "Stumped" && names.fielder) return `STUMPED! ${names.fielder} whips off the bails — ${who} gone.`;
+    return `WICKET! ${who} departs (${wt}) off ${b}.`;
+  }
+  if (ball.extra_type === "wide") return `Wide called against ${b}. ${1 + (ball.runs ?? 0)} extra${ball.runs ? ` (+${ball.runs} run${ball.runs > 1 ? "s" : ""})` : ""}.`;
+  if (ball.extra_type === "no_ball") return `No ball! Free hit territory. ${ball.runs ? `${s} pinches ${ball.runs} off the bat.` : "1 run added."}`;
+  if (ball.extra_type === "bye") return `${ball.extra_runs} bye${ball.extra_runs > 1 ? "s" : ""} — keeper beaten by ${b}.`;
+  if (ball.extra_type === "leg_bye") return `${ball.extra_runs} leg bye${ball.extra_runs > 1 ? "s" : ""} off the pads of ${s}.`;
+  const r = ball.runs ?? 0;
+  if (r === 6) return `SIX! ${s} launches ${b} into the stands! Massive hit!`;
+  if (r === 4) return `FOUR! ${s} times it sweetly off ${b} — to the fence!`;
+  if (r === 3) return `Three runs, well run by ${s}.`;
+  if (r === 2) return `Couple of runs picked up by ${s}.`;
+  if (r === 1) return `Single taken, ${s} rotates strike.`;
+  return `Dot ball. ${b} keeps ${s} honest.`;
+}
+
+// ---------- Partnerships ----------
+export interface Partnership {
+  innings: number;
+  wicket: number; // 1st, 2nd, …
+  runs: number;
+  balls: number;
+  player1: string;
+  player2: string;
+  unbeaten: boolean;
+}
+
+export function computePartnerships(balls: Ball[], innings: number): Partnership[] {
+  const out: Partnership[] = [];
+  let current: Partnership | null = null;
+  let wicketNo = 0;
+  for (const b of balls) {
+    if (b.innings_number !== innings) continue;
+    if (!b.striker_id || !b.non_striker_id) continue;
+    if (!current || (current.player1 !== b.striker_id && current.player1 !== b.non_striker_id) ||
+      (current.player2 !== b.striker_id && current.player2 !== b.non_striker_id)) {
+      wicketNo += 1;
+      current = {
+        innings,
+        wicket: wicketNo,
+        runs: 0,
+        balls: 0,
+        player1: b.striker_id,
+        player2: b.non_striker_id,
+        unbeaten: true,
+      };
+      out.push(current);
+    }
+    const runs = (b.runs ?? 0) + (b.extra_runs ?? 0);
+    current.runs += runs;
+    if (b.is_legal_ball) current.balls += 1;
+    if (b.is_wicket) current.unbeaten = false;
+  }
+  return out;
+}
