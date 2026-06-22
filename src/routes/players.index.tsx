@@ -6,7 +6,7 @@ import { AppShell } from "@/components/AppShell";
 import { PLAYER_ROLES, type Player, type PlayerRole } from "@/lib/cricket";
 import { Search, UserPlus, Trash2 } from "lucide-react";
 
-export const Route = createFileRoute("/players")({
+export const Route = createFileRoute("/players/")({
   head: () => ({
     meta: [
       { title: "Squad — BELLAMLABIDI" },
