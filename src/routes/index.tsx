@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
 import {
@@ -58,10 +59,15 @@ function Dashboard() {
   const weekCount = matches.filter((m) => isAfter(m.match_date, startOfWeek)).length;
   const monthCount = matches.filter((m) => isAfter(m.match_date, startOfMonth)).length;
 
-  // Aggregate career stats across all balls
-  const batting = computeBatting(balls);
-  const bowling = computeBowling(balls);
-  const fielding = computeFielding(balls);
+  // Period filter for awards
+  const [period, setPeriod] = useState<"all" | "today" | "week" | "month">("all");
+  const periodStart = period === "today" ? startOfDay : period === "week" ? startOfWeek : period === "month" ? startOfMonth : 0;
+  const allowedMatchIds = new Set(matches.filter((m) => new Date(m.match_date).getTime() >= periodStart).map((m) => m.id));
+  const periodBalls = period === "all" ? balls : balls.filter((b) => allowedMatchIds.has(b.match_id));
+
+  const batting = computeBatting(periodBalls);
+  const bowling = computeBowling(periodBalls);
+  const fielding = computeFielding(periodBalls);
 
   const playerName = (id: string) => players.find((p) => p.id === id)?.name ?? "—";
 
@@ -115,6 +121,15 @@ function Dashboard() {
       </section>
 
       <section className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-8">
+        <div className="md:col-span-2 flex flex-wrap items-center gap-2">
+          <span className="text-xs font-display tracking-widest text-muted-foreground mr-1">AWARDS:</span>
+          {(["all", "today", "week", "month"] as const).map((p) => (
+            <button key={p} onClick={() => setPeriod(p)}
+              className={`text-xs font-display tracking-wider px-3 py-1.5 rounded-md border ${period === p ? "bg-primary text-primary-foreground border-primary" : "bg-secondary text-foreground border-border hover:bg-secondary/70"}`}>
+              {p === "all" ? "All-time" : p === "today" ? "Today" : p === "week" ? "This week" : "This month"}
+            </button>
+          ))}
+        </div>
         <Leaderboard title="Top Run Scorers" icon={Trophy} rows={topRuns.map((r) => ({ name: playerName(r.playerId), main: r.runs, sub: `${r.fours}×4  ${r.sixes}×6` }))} mainLabel="Runs" />
         <Leaderboard title="Top Wicket Takers" icon={Target} rows={topWickets.map((r) => ({ name: playerName(r.playerId), main: r.wickets, sub: `Eco ${r.economy.toFixed(2)}` }))} mainLabel="Wkts" />
         <Leaderboard title="Best Strike Rates" icon={Flame} rows={topSR.map((r) => ({ name: playerName(r.playerId), main: r.strikeRate.toFixed(1), sub: `${r.runs}(${r.ballsFaced})` }))} mainLabel="SR" />
