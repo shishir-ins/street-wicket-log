@@ -1,12 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
 import {
   computeBatting, computeBowling, computeFielding,
   type Ball, type Player, type Match,
 } from "@/lib/cricket";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Camera } from "lucide-react";
 
 export const Route = createFileRoute("/players/$id")({
   head: () => ({
@@ -20,6 +21,31 @@ export const Route = createFileRoute("/players/$id")({
 
 function PlayerProfile() {
   const { id } = Route.useParams();
+  const qc = useQueryClient();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploadErr, setUploadErr] = useState<string | null>(null);
+
+  const uploadPhoto = useMutation({
+    mutationFn: async (file: File) => {
+      const ext = file.name.split(".").pop() || "jpg";
+      const path = `${id}/${Date.now()}.${ext}`;
+      const up = await supabase.storage.from("player-photos").upload(path, file, { upsert: true });
+      if (up.error) throw up.error;
+      const signed = await supabase.storage.from("player-photos").createSignedUrl(path, 60 * 60 * 24 * 365 * 10);
+      if (signed.error) throw signed.error;
+      const url = signed.data.signedUrl;
+      const { error } = await supabase.from("players").update({ photo_url: url }).eq("id", id);
+      if (error) throw error;
+      return url;
+    },
+    onSuccess: () => {
+      setUploadErr(null);
+      qc.invalidateQueries({ queryKey: ["player", id] });
+      qc.invalidateQueries({ queryKey: ["players"] });
+    },
+    onError: (e) => setUploadErr((e as Error).message),
+  });
+
   const playerQ = useQuery({
     queryKey: ["player", id],
     queryFn: async () => {
@@ -84,13 +110,49 @@ function PlayerProfile() {
       </Link>
       <div className="chalk-board p-6 sm:p-8 mb-6">
         <div className="flex items-center gap-5">
-          <span className="h-20 w-20 rounded-full bg-primary/15 border border-primary/30 text-primary flex items-center justify-center font-display text-3xl">
-            {p.name.slice(0, 2).toUpperCase()}
-          </span>
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            className="relative h-20 w-20 rounded-full overflow-hidden border border-primary/30 group/avatar"
+            aria-label="Upload photo"
+          >
+            {p.photo_url ? (
+              <img src={p.photo_url} alt={p.name} className="h-full w-full object-cover" />
+            ) : (
+              <span className="h-full w-full bg-primary/15 text-primary flex items-center justify-center font-display text-3xl">
+                {p.name.slice(0, 2).toUpperCase()}
+              </span>
+            )}
+            <span className="absolute inset-0 bg-black/50 opacity-0 group-hover/avatar:opacity-100 transition flex items-center justify-center text-white">
+              <Camera className="h-5 w-5" />
+            </span>
+            {uploadPhoto.isPending && (
+              <span className="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-xs font-display">…</span>
+            )}
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) uploadPhoto.mutate(f);
+              e.target.value = "";
+            }}
+          />
           <div>
             <span className="tape-tag text-xs">{p.role.toUpperCase()}</span>
             <h1 className="text-4xl sm:text-5xl font-display tracking-widest mt-2">{p.name}</h1>
             <p className="font-chalk text-muted-foreground">{myMatches.length} matches · {innings.size} innings</p>
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              className="mt-2 inline-flex items-center gap-1 text-xs font-display tracking-wider text-primary hover:underline"
+            >
+              <Camera className="h-3 w-3" /> {p.photo_url ? "Change photo" : "Upload photo"}
+            </button>
+            {uploadErr && <p className="text-destructive text-xs mt-1">{uploadErr}</p>}
           </div>
         </div>
       </div>
