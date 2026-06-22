@@ -535,6 +535,10 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
       <ScorecardBlock title={`${battingTeamName} batting`} ids={battingTeamWithCommon} byId={byId} balls={inningsBalls} mode="bat" />
       <ScorecardBlock title={`${bowlingTeamName} bowling`} ids={bowlingTeamWithCommon} byId={byId} balls={inningsBalls} mode="bowl" />
 
+      <PartnershipsBlock balls={inningsBalls} innings={innings} byId={byId} />
+      <CommentaryFeed balls={inningsBalls} />
+      <ShareToolbar match={match} balls={balls} byId={byId} />
+
       <p className="text-xs text-muted-foreground mt-6">Team size: {battingTeamSizeForUI}. Saves automatically with every ball.</p>
     </AppShell>
   );
