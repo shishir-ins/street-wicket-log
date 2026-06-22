@@ -839,6 +839,13 @@ function FinalScorecard({ match, balls, byId }: { match: Match; balls: Ball[]; b
       <ScorecardBlock title={`${team2Name} bowling`} ids={team2Ids} byId={byId} balls={balls.filter((b) => b.innings_number === 1)} mode="bowl" />
       <ScorecardBlock title={`${team2Name} batting`} ids={team2Ids} byId={byId} balls={balls.filter((b) => b.innings_number === 2)} mode="bat" />
       <ScorecardBlock title={`${team1Name} bowling`} ids={team1Ids} byId={byId} balls={balls.filter((b) => b.innings_number === 2)} mode="bowl" />
+
+      <PartnershipsBlock balls={balls.filter((b) => b.innings_number === 1)} innings={1} byId={byId} />
+      <PartnershipsBlock balls={balls.filter((b) => b.innings_number === 2)} innings={2} byId={byId} />
+      <RunWheel balls={balls.filter((b) => b.innings_number === 1)} title={`${team1Name} run wheel`} />
+      <RunWheel balls={balls.filter((b) => b.innings_number === 2)} title={`${team2Name} run wheel`} />
+      <CommentaryFeed balls={balls} />
+      <ShareToolbar match={match} balls={balls} byId={byId} />
     </AppShell>
   );
 }
@@ -852,6 +859,188 @@ function InningsCard({ label, totals, overs }: { label: string; totals: ReturnTy
         <span className="score-tile text-xl text-muted-foreground">/{totals.wickets}</span>
       </div>
       <div className="text-xs text-muted-foreground mt-1">{oversString(totals.legalBalls)} / {overs} overs · {totals.fours}×4 {totals.sixes}×6 · Extras {totals.extras}</div>
+    </div>
+  );
+}
+
+// ---------- PARTNERSHIPS ----------
+function PartnershipsBlock({ balls, innings, byId }: { balls: Ball[]; innings: number; byId: Record<string, Player> }) {
+  const parts = computePartnerships(balls, innings);
+  if (parts.length === 0) return null;
+  const maxRuns = Math.max(...parts.map((p) => p.runs), 1);
+  return (
+    <div className="chalk-board p-4 mt-4">
+      <h3 className="font-display tracking-widest mb-3 flex items-center gap-2"><Users className="h-4 w-4 text-primary" />Partnerships — Innings {innings}</h3>
+      <ul className="space-y-2">
+        {parts.map((p) => (
+          <li key={`${p.innings}-${p.wicket}`} className="text-sm">
+            <div className="flex items-center justify-between gap-2">
+              <span className="truncate"><span className="text-muted-foreground mr-1">{p.wicket}.</span>{byId[p.player1]?.name ?? "?"} & {byId[p.player2]?.name ?? "?"}</span>
+              <span className="font-display tracking-wide">{p.runs}<span className="text-xs text-muted-foreground"> ({p.balls}){p.unbeaten ? "*" : ""}</span></span>
+            </div>
+            <div className="h-1.5 mt-1 rounded bg-secondary overflow-hidden">
+              <div className="h-full bg-primary/70" style={{ width: `${(p.runs / maxRuns) * 100}%` }} />
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// ---------- COMMENTARY FEED ----------
+function CommentaryFeed({ balls }: { balls: Ball[] }) {
+  const ordered = [...balls].sort((a, b) => b.ball_index - a.ball_index).slice(0, 30);
+  if (ordered.length === 0) return null;
+  return (
+    <div className="chalk-board p-4 mt-4">
+      <h3 className="font-display tracking-widest mb-3 flex items-center gap-2"><MessageSquare className="h-4 w-4 text-primary" />Commentary</h3>
+      <ul className="space-y-2 max-h-[420px] overflow-y-auto pr-2">
+        {ordered.map((b) => (
+          <li key={b.id} className="text-sm border-b border-border/30 pb-2 last:border-0">
+            <span className="font-display text-xs text-muted-foreground mr-2">{b.over_number}.{b.ball_in_over}</span>
+            {b.commentary ?? `${b.runs} run${b.runs === 1 ? "" : "s"}`}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// ---------- RUN WHEEL (run distribution donut) ----------
+function RunWheel({ balls, title }: { balls: Ball[]; title: string }) {
+  const buckets = { dots: 0, ones: 0, twos: 0, threes: 0, fours: 0, sixes: 0, extras: 0 };
+  for (const b of balls) {
+    if (b.extra_type) { buckets.extras += (b.extra_runs ?? 0) + (b.runs ?? 0); continue; }
+    const r = b.runs ?? 0;
+    if (r === 0) buckets.dots += 1;
+    else if (r === 1) buckets.ones += 1;
+    else if (r === 2) buckets.twos += 2;
+    else if (r === 3) buckets.threes += 3;
+    else if (r === 4) buckets.fours += 4;
+    else if (r >= 6) buckets.sixes += 6;
+  }
+  const total = buckets.ones + buckets.twos + buckets.threes + buckets.fours + buckets.sixes + buckets.extras;
+  if (total === 0) return null;
+  const segs: { label: string; value: number; color: string }[] = [
+    { label: "1s", value: buckets.ones, color: "hsl(var(--muted-foreground))" },
+    { label: "2s", value: buckets.twos, color: "hsl(var(--accent))" },
+    { label: "3s", value: buckets.threes, color: "hsl(var(--secondary-foreground))" },
+    { label: "4s", value: buckets.fours, color: "hsl(var(--primary))" },
+    { label: "6s", value: buckets.sixes, color: "hsl(var(--destructive))" },
+    { label: "Ext", value: buckets.extras, color: "hsl(var(--ring))" },
+  ];
+  const R = 70, C = 2 * Math.PI * R;
+  let offset = 0;
+  return (
+    <div className="chalk-board p-4 mt-4">
+      <h3 className="font-display tracking-widest mb-3">{title}</h3>
+      <div className="flex flex-wrap items-center gap-6">
+        <svg width="180" height="180" viewBox="0 0 180 180">
+          <g transform="translate(90 90) rotate(-90)">
+            <circle r={R} fill="none" stroke="hsl(var(--border))" strokeWidth="22" />
+            {segs.map((s) => {
+              const len = (s.value / total) * C;
+              const el = (
+                <circle key={s.label} r={R} fill="none" stroke={s.color} strokeWidth="22"
+                  strokeDasharray={`${len} ${C - len}`} strokeDashoffset={-offset} />
+              );
+              offset += len;
+              return el;
+            })}
+          </g>
+          <text x="90" y="95" textAnchor="middle" className="font-display fill-foreground" style={{ fontSize: 22 }}>{total}</text>
+        </svg>
+        <ul className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm font-chalk">
+          {segs.map((s) => (
+            <li key={s.label} className="flex items-center gap-2">
+              <span className="inline-block h-3 w-3 rounded-sm" style={{ background: s.color }} />
+              <span className="text-muted-foreground">{s.label}</span>
+              <span className="ml-auto">{s.value}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+// ---------- SHARE / PDF ----------
+function buildScorecardText(match: Match, balls: Ball[], byId: Record<string, Player>): string {
+  const i1 = computeInningsTotals(balls, 1);
+  const i2 = computeInningsTotals(balls, 2);
+  const lines: string[] = [];
+  lines.push(`🏏 ${match.team_a_name} vs ${match.team_b_name}`);
+  lines.push(`${new Date(match.match_date).toLocaleString()} · ${match.total_overs} overs/side`);
+  lines.push("");
+  const team1 = match.batting_first === "A" ? match.team_a_name : match.team_b_name;
+  const team2 = match.batting_first === "A" ? match.team_b_name : match.team_a_name;
+  lines.push(`${team1}: ${i1.runs}/${i1.wickets} (${oversString(i1.legalBalls)})`);
+  if (i2.legalBalls > 0) lines.push(`${team2}: ${i2.runs}/${i2.wickets} (${oversString(i2.legalBalls)})`);
+  lines.push("");
+  const bat = computeBatting(balls);
+  const top = Object.values(bat).sort((a, b) => b.runs - a.runs).slice(0, 3);
+  if (top.length) {
+    lines.push("Top scorers:");
+    for (const t of top) lines.push(`  • ${byId[t.playerId]?.name ?? "?"} ${t.runs}(${t.ballsFaced})`);
+  }
+  const bow = computeBowling(balls);
+  const wkt = Object.values(bow).sort((a, b) => b.wickets - a.wickets).slice(0, 3).filter((b) => b.wickets > 0);
+  if (wkt.length) {
+    lines.push("Top wickets:");
+    for (const w of wkt) lines.push(`  • ${byId[w.playerId]?.name ?? "?"} ${w.wickets}/${w.runsConceded}`);
+  }
+  lines.push("");
+  lines.push("— Scored on BELLAMLABIDI");
+  return lines.join("\n");
+}
+
+function ShareToolbar({ match, balls, byId }: { match: Match; balls: Ball[]; byId: Record<string, Player> }) {
+  const [busy, setBusy] = useState<"pdf" | "share" | null>(null);
+  const text = buildScorecardText(match, balls, byId);
+
+  const onShare = async () => {
+    setBusy("share");
+    try {
+      const navAny = navigator as unknown as { share?: (d: { title: string; text: string }) => Promise<void> };
+      if (navAny.share) {
+        await navAny.share({ title: `${match.team_a_name} vs ${match.team_b_name}`, text });
+      } else {
+        await navigator.clipboard.writeText(text);
+        alert("Scorecard copied to clipboard!");
+      }
+    } catch (e) { /* user cancelled */ void e; }
+    setBusy(null);
+  };
+
+  const onPdf = async () => {
+    setBusy("pdf");
+    try {
+      const jsPDFmod = await import("jspdf");
+      const doc = new jsPDFmod.jsPDF({ unit: "pt", format: "a4" });
+      doc.setFont("helvetica", "bold"); doc.setFontSize(20);
+      doc.text("BELLAMLABIDI", 40, 50);
+      doc.setFontSize(14); doc.setFont("helvetica", "normal");
+      doc.text(`${match.team_a_name} vs ${match.team_b_name}`, 40, 75);
+      doc.setFontSize(10); doc.setTextColor(120);
+      doc.text(`${new Date(match.match_date).toLocaleString()} · ${match.total_overs} overs/side`, 40, 92);
+      doc.setTextColor(20);
+      const body = text.split("\n");
+      let y = 120;
+      for (const ln of body) { doc.text(ln, 40, y); y += 16; if (y > 780) { doc.addPage(); y = 60; } }
+      doc.save(`${match.team_a_name}-vs-${match.team_b_name}.pdf`);
+    } catch (e) { alert("Could not build PDF: " + (e as Error).message); }
+    setBusy(null);
+  };
+
+  return (
+    <div className="chalk-board p-4 mt-4 flex flex-wrap gap-2">
+      <button onClick={onShare} disabled={busy !== null} className="btn-chalk rounded-md px-4 py-2 bg-primary/20 text-primary inline-flex items-center gap-2 disabled:opacity-50">
+        <Share2 className="h-4 w-4" /> {busy === "share" ? "Sharing…" : "Share scorecard"}
+      </button>
+      <button onClick={onPdf} disabled={busy !== null} className="btn-chalk rounded-md px-4 py-2 bg-secondary inline-flex items-center gap-2 disabled:opacity-50">
+        <FileDown className="h-4 w-4" /> {busy === "pdf" ? "Building…" : "Download PDF"}
+      </button>
     </div>
   );
 }
