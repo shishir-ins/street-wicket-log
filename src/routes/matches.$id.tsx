@@ -145,17 +145,16 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
       const isLegal = !(payload.extraType === "wide" || payload.extraType === "no_ball");
 
       // Custom BELLAMLABIDI wide rule:
-      //   1st wide  -> 1 run + extra ball
-      //   2nd consecutive wide -> 0 run + extra ball
-      //   3rd+ consecutive wides -> 1 run each + extra ball
-      let wideBaseRun = 1;
+      //   1st wide  -> 0 run + extra ball
+      //   2nd+ consecutive wides -> 1 run each + extra ball
+      let wideBaseRun = 0;
       if (payload.extraType === "wide") {
         let consecutive = 1; // including this one
         for (let i = inningsBalls.length - 1; i >= 0; i--) {
           if (inningsBalls[i].extra_type === "wide") consecutive += 1;
           else break;
         }
-        wideBaseRun = consecutive === 2 ? 0 : 1;
+        wideBaseRun = consecutive === 1 ? 0 : 1;
       }
 
       const extraRuns =
