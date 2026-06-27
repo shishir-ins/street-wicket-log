@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
 import { PLAYER_ROLES, type Player, type PlayerRole } from "@/lib/cricket";
 import { Search, UserPlus, Trash2 } from "lucide-react";
+import { useAdmin, AdminLockButton } from "@/lib/admin";
 
 export const Route = createFileRoute("/players/")({
   head: () => ({
@@ -21,6 +22,7 @@ function PlayersPage() {
   const [name, setName] = useState("");
   const [role, setRole] = useState<PlayerRole>("All-rounder");
   const [q, setQ] = useState("");
+  const { isAdmin } = useAdmin();
 
   const playersQ = useQuery({
     queryKey: ["players"],
@@ -62,11 +64,15 @@ function PlayersPage() {
           <h1 className="text-4xl font-display tracking-widest mt-2">Players</h1>
           <p className="font-chalk text-lg text-muted-foreground">tap a name to see their career.</p>
         </div>
-        <div className="text-sm text-muted-foreground font-display tracking-widest">
-          {playersQ.data?.length ?? 0} REGISTERED
+        <div className="flex items-center gap-3">
+          <div className="text-sm text-muted-foreground font-display tracking-widest">
+            {playersQ.data?.length ?? 0} REGISTERED
+          </div>
+          <AdminLockButton />
         </div>
       </div>
 
+      {isAdmin ? (
       <div className="chalk-board p-5 mb-6">
         <h2 className="font-display tracking-widest mb-3 flex items-center gap-2"><UserPlus className="h-4 w-4 text-primary" />Add player</h2>
         <form
@@ -96,6 +102,11 @@ function PlayersPage() {
         </form>
         {addPlayer.error ? <p className="text-destructive text-sm mt-2">{(addPlayer.error as Error).message}</p> : null}
       </div>
+      ) : (
+        <div className="chalk-board p-4 mb-6 text-xs text-muted-foreground font-chalk">
+          🔒 Adding or removing players is restricted to admin. Tap the ADMIN button to unlock.
+        </div>
+      )}
 
       <div className="flex items-center gap-2 mb-3">
         <div className="relative flex-1">
@@ -125,13 +136,15 @@ function PlayersPage() {
                 <div className="text-xs text-muted-foreground">{p.role}</div>
               </div>
             </Link>
-            <button
-              onClick={() => { if (confirm(`Remove ${p.name}?`)) removePlayer.mutate(p.id); }}
-              className="p-2 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition"
-              aria-label="Remove"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
+            {isAdmin && (
+              <button
+                onClick={() => { if (confirm(`Remove ${p.name}?`)) removePlayer.mutate(p.id); }}
+                className="p-2 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition"
+                aria-label="Remove"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
           </div>
         ))}
         {list.length === 0 && !playersQ.isLoading && (

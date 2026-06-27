@@ -83,7 +83,10 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
   const qc = useQueryClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const state = match.state as any as MatchState;
-  const totalBalls = match.total_overs * 6;
+  // If a previous innings was declared with a cap, restrict this innings to the same number of legal balls.
+  const totalBalls = state.innings === 2 && state.inningsBallsCap != null
+    ? state.inningsBallsCap
+    : match.total_overs * 6;
   const innings = state.innings;
 
   const inningsBalls = balls.filter((b) => b.innings_number === innings);
@@ -140,12 +143,29 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
       fielderId?: string;
     }) => {
       const isLegal = !(payload.extraType === "wide" || payload.extraType === "no_ball");
+
+      // Custom BELLAMLABIDI wide rule:
+      //   1st wide  -> 1 run + extra ball
+      //   2nd consecutive wide -> 0 run + extra ball
+      //   3rd+ consecutive wides -> 1 run each + extra ball
+      let wideBaseRun = 1;
+      if (payload.extraType === "wide") {
+        let consecutive = 1; // including this one
+        for (let i = inningsBalls.length - 1; i >= 0; i--) {
+          if (inningsBalls[i].extra_type === "wide") consecutive += 1;
+          else break;
+        }
+        wideBaseRun = consecutive === 2 ? 0 : 1;
+      }
+
       const extraRuns =
-        payload.extraType === "wide" || payload.extraType === "no_ball"
-          ? 1 + (payload.extraType === "wide" ? payload.runs : 0)
-          : payload.extraType === "bye" || payload.extraType === "leg_bye"
-            ? payload.runs
-            : 0;
+        payload.extraType === "wide"
+          ? wideBaseRun + payload.runs
+          : payload.extraType === "no_ball"
+            ? 1
+            : payload.extraType === "bye" || payload.extraType === "leg_bye"
+              ? payload.runs
+              : 0;
       const batRuns =
         payload.extraType === "wide" || payload.extraType === "bye" || payload.extraType === "leg_bye"
           ? 0
@@ -329,6 +349,40 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
     setStateMut.mutate({ status: next });
   };
 
+  // Declare / Forfeit current innings (innings 1 only -> sets cap & target for innings 2;
+  // innings 2 -> ends the match)
+  const declareInnings = useMutation({
+    mutationFn: async () => {
+      if (innings === 1) {
+        const nextState: MatchState = {
+          ...state,
+          target: totals.runs + 1,
+          inningsBallsCap: totals.legalBalls,
+          declared: true,
+        };
+        const { error } = await supabase.from("matches")
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .update({ state: nextState as any, status: "innings_break" }).eq("id", match.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("matches")
+          .update({ status: "completed" }).eq("id", match.id);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["match", match.id] });
+      if (innings === 1) setInningsBreakDialog(true);
+    },
+  });
+
+  const onDeclare = () => {
+    const msg = innings === 1
+      ? `Declare ${battingTeamName} innings at ${totals.runs}/${totals.wickets}? Innings 2 will be capped to ${oversString(totals.legalBalls)} overs.`
+      : `Forfeit ${battingTeamName} innings and end the match?`;
+    if (window.confirm(msg)) declareInnings.mutate();
+  };
+
   const overTimeline = useMemo(() => buildOverTimeline(balls, innings), [balls, innings]);
   const currentOver = overTimeline[overTimeline.length - 1];
   const prevOver = overTimeline[overTimeline.length - 2];
@@ -354,6 +408,12 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
           <button onClick={togglePause} className="btn-chalk rounded-md px-3 py-1.5 text-xs inline-flex items-center gap-1">
             {isPaused ? <><Play className="h-3.5 w-3.5"/>Resume</> : <><Pause className="h-3.5 w-3.5"/>Break</>}
           </button>
+          {!isInningsBreak && (
+            <button onClick={onDeclare} disabled={declareInnings.isPending}
+              className="btn-chalk rounded-md px-3 py-1.5 text-xs inline-flex items-center gap-1 text-accent border-accent/40">
+              {innings === 1 ? "Declare" : "Forfeit"}
+            </button>
+          )}
         </div>
       </div>
 
