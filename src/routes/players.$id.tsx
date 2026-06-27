@@ -8,6 +8,7 @@ import {
   type Ball, type Player, type Match,
 } from "@/lib/cricket";
 import { ArrowLeft, Camera } from "lucide-react";
+import { useAdmin, AdminLockButton } from "@/lib/admin";
 
 export const Route = createFileRoute("/players/$id")({
   head: () => ({
@@ -24,6 +25,8 @@ function PlayerProfile() {
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploadErr, setUploadErr] = useState<string | null>(null);
+  const [photoOpen, setPhotoOpen] = useState(false);
+  const { isAdmin } = useAdmin();
 
   const uploadPhoto = useMutation({
     mutationFn: async (file: File) => {
@@ -105,16 +108,22 @@ function PlayerProfile() {
 
   return (
     <AppShell>
-      <Link to="/players" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4">
-        <ArrowLeft className="h-4 w-4" /> Squad
-      </Link>
+      <div className="flex items-center justify-between mb-4">
+        <Link to="/players" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="h-4 w-4" /> Squad
+        </Link>
+        <AdminLockButton />
+      </div>
       <div className="chalk-board p-6 sm:p-8 mb-6">
         <div className="flex items-center gap-5">
           <button
             type="button"
-            onClick={() => fileRef.current?.click()}
+            onClick={() => {
+              if (p.photo_url) setPhotoOpen(true);
+              else if (isAdmin) fileRef.current?.click();
+            }}
             className="relative h-20 w-20 rounded-full overflow-hidden border border-primary/30 group/avatar"
-            aria-label="Upload photo"
+            aria-label={p.photo_url ? "View photo" : "Upload photo"}
           >
             {p.photo_url ? (
               <img src={p.photo_url} alt={p.name} className="h-full w-full object-cover" />
@@ -123,9 +132,11 @@ function PlayerProfile() {
                 {p.name.slice(0, 2).toUpperCase()}
               </span>
             )}
-            <span className="absolute inset-0 bg-black/50 opacity-0 group-hover/avatar:opacity-100 transition flex items-center justify-center text-white">
-              <Camera className="h-5 w-5" />
-            </span>
+            {(isAdmin || !p.photo_url) && (
+              <span className="absolute inset-0 bg-black/50 opacity-0 group-hover/avatar:opacity-100 transition flex items-center justify-center text-white">
+                <Camera className="h-5 w-5" />
+              </span>
+            )}
             {uploadPhoto.isPending && (
               <span className="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-xs font-display">…</span>
             )}
@@ -145,17 +156,28 @@ function PlayerProfile() {
             <span className="tape-tag text-xs">{p.role.toUpperCase()}</span>
             <h1 className="text-4xl sm:text-5xl font-display tracking-widest mt-2">{p.name}</h1>
             <p className="font-chalk text-muted-foreground">{myMatches.length} matches · {innings.size} innings</p>
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              className="mt-2 inline-flex items-center gap-1 text-xs font-display tracking-wider text-primary hover:underline"
-            >
-              <Camera className="h-3 w-3" /> {p.photo_url ? "Change photo" : "Upload photo"}
-            </button>
+            {isAdmin ? (
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                className="mt-2 inline-flex items-center gap-1 text-xs font-display tracking-wider text-primary hover:underline"
+              >
+                <Camera className="h-3 w-3" /> {p.photo_url ? "Change photo" : "Upload photo"}
+              </button>
+            ) : !p.photo_url ? (
+              <p className="mt-2 text-xs text-muted-foreground">🔒 Admin can upload a photo.</p>
+            ) : null}
             {uploadErr && <p className="text-destructive text-xs mt-1">{uploadErr}</p>}
           </div>
         </div>
       </div>
+
+      {photoOpen && p.photo_url && (
+        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4" onClick={() => setPhotoOpen(false)}>
+          <img src={p.photo_url} alt={p.name} className="max-h-[90vh] max-w-[95vw] object-contain rounded-md" />
+          <button onClick={() => setPhotoOpen(false)} className="absolute top-4 right-4 text-white text-2xl">✕</button>
+        </div>
+      )}
 
       <h2 className="font-display tracking-widest text-xl mb-3">Career Batting</h2>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
