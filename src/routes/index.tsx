@@ -88,7 +88,7 @@ function Dashboard() {
             <div>
               <span className="tape-tag text-sm">EST. 2026</span>
               <h1 className="mt-3 text-4xl sm:text-6xl font-display tracking-widest">
-                THE PITCH<span className="text-primary">.</span>
+                BELLAMLABIDI<span className="text-primary">.</span>
               </h1>
               <p className="font-chalk text-xl text-chalk-dim mt-1" style={{ color: "var(--chalk-dim)" }}>
                 where every gully match becomes history
