@@ -238,7 +238,10 @@ export function commentaryFor(
     if (wt === "Stumped" && names.fielder) return `STUMPED! ${names.fielder} whips off the bails — ${who} gone.`;
     return `WICKET! ${who} departs (${wt}) off ${b}.`;
   }
-  if (ball.extra_type === "wide") return `Wide called against ${b}. ${1 + (ball.runs ?? 0)} extra${ball.runs ? ` (+${ball.runs} run${ball.runs > 1 ? "s" : ""})` : ""}.`;
+  if (ball.extra_type === "wide") {
+    const total = (ball.extra_runs ?? 0) + (ball.runs ?? 0);
+    return `Wide called against ${b}.${total > 0 ? ` ${total} extra${total > 1 ? "s" : ""}.` : " Extra ball, no run."}`;
+  }
   if (ball.extra_type === "no_ball") return `No ball! Free hit territory. ${ball.runs ? `${s} pinches ${ball.runs} off the bat.` : "1 run added."}`;
   if (ball.extra_type === "bye") return `${ball.extra_runs} bye${ball.extra_runs > 1 ? "s" : ""} — keeper beaten by ${b}.`;
   if (ball.extra_type === "leg_bye") return `${ball.extra_runs} leg bye${ball.extra_runs > 1 ? "s" : ""} off the pads of ${s}.`;
