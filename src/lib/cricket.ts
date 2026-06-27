@@ -21,6 +21,9 @@ export interface MatchState {
   isPaused?: boolean;
   pauseReason?: "innings_break" | "match_break";
   target?: number | null;
+  /** When an innings is declared/forfeited mid-overs, this caps the next innings to the same number of legal balls. */
+  inningsBallsCap?: number | null;
+  declared?: boolean;
 }
 
 export interface InningsTotals {
