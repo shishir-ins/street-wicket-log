@@ -112,7 +112,19 @@ function NewMatch() {
             <div className="grid sm:grid-cols-3 gap-3">
               <Field label="Team A name"><input className="w-full bg-input/40 border border-border rounded-md px-3 py-2" value={teamAName} onChange={(e) => setTeamAName(e.target.value)} /></Field>
               <Field label="Team B name"><input className="w-full bg-input/40 border border-border rounded-md px-3 py-2" value={teamBName} onChange={(e) => setTeamBName(e.target.value)} /></Field>
-              <Field label="Overs per innings"><input type="number" min={1} max={50} className="w-full bg-input/40 border border-border rounded-md px-3 py-2" value={overs} onChange={(e) => setOvers(Math.max(1, +e.target.value || 1))} /></Field>
+              <Field label="Overs per innings">
+                <div className="space-y-2">
+                  <input type="number" min={1} max={50} className="w-full bg-input/40 border border-border rounded-md px-3 py-2" value={overs} onChange={(e) => setOvers(Math.max(1, +e.target.value || 1))} />
+                  <div className="flex flex-wrap gap-1.5">
+                    {[4, 6, 8, 10, 12, 15, 20].map((n) => (
+                      <button key={n} type="button" onClick={() => setOvers(n)}
+                        className={`btn-chalk rounded-md px-2.5 py-1 text-xs ${overs === n ? "bg-primary/20 text-primary border-primary/50" : ""}`}>
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </Field>
             </div>
           </div>
 
