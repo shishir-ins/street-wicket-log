@@ -46,7 +46,7 @@ export function computeInningsTotals(balls: Ball[], innings: number): InningsTot
     t.runs += (b.runs ?? 0) + (b.extra_runs ?? 0);
     if (b.is_legal_ball) t.legalBalls += 1;
     if (!b.is_legal_ball) t.extras += b.extra_runs ?? 0;
-    if (b.extra_type === "bye" || b.extra_type === "leg_bye") t.extras += b.extra_runs ?? 0;
+    if (b.extra_type === "bye" || b.extra_type === "leg_bye" || b.extra_type === "declared") t.extras += b.extra_runs ?? 0;
     if (b.is_wicket) t.wickets += 1;
     if (!b.extra_type && b.runs === 4) t.fours += 1;
     if (!b.extra_type && b.runs === 6) t.sixes += 1;
@@ -106,6 +106,8 @@ export function computeBatting(balls: Ball[]): Record<string, BattingLine> {
       // wide: no ball faced, no runs to batter
     } else if (b.extra_type === "bye" || b.extra_type === "leg_bye") {
       s.ballsFaced += 1; // ball faced, no runs to batter
+    } else if (b.extra_type === "declared") {
+      s.ballsFaced += 1; // 1D counts as a ball faced, no runs to batter
     } else if (b.extra_type === "no_ball") {
       s.runs += b.runs ?? 0; // batter gets bat runs off no ball, ball not counted
     } else {
@@ -143,7 +145,7 @@ export function computeBowling(balls: Ball[]): Record<string, BowlingLine> {
     if (b.is_legal_ball) bl.legalBalls += 1;
     // Concede runs: bat runs always + wide/no_ball penalties; byes/leg byes NOT charged to bowler
     const conceded =
-      (b.extra_type === "bye" || b.extra_type === "leg_bye")
+      (b.extra_type === "bye" || b.extra_type === "leg_bye" || b.extra_type === "declared")
         ? 0
         : (b.runs ?? 0) + (b.extra_runs ?? 0);
     bl.runsConceded += conceded;
@@ -196,6 +198,7 @@ export function buildOverTimeline(balls: Ball[], innings: number): OverEvent[] {
     else if (b.extra_type === "no_ball") label = `Nb${b.runs ? "+" + b.runs : ""}`;
     else if (b.extra_type === "bye") label = `B${b.extra_runs ?? 0}`;
     else if (b.extra_type === "leg_bye") label = `Lb${b.extra_runs ?? 0}`;
+    else if (b.extra_type === "declared") label = `1D`;
     if (b.is_wicket) label = "W";
     if (b.runs === 4 && !b.extra_type) label = "4";
     if (b.runs === 6 && !b.extra_type) label = "6";
@@ -245,6 +248,7 @@ export function commentaryFor(
   if (ball.extra_type === "no_ball") return `No ball! Free hit territory. ${ball.runs ? `${s} pinches ${ball.runs} off the bat.` : "1 run added."}`;
   if (ball.extra_type === "bye") return `${ball.extra_runs} bye${ball.extra_runs > 1 ? "s" : ""} — keeper beaten by ${b}.`;
   if (ball.extra_type === "leg_bye") return `${ball.extra_runs} leg bye${ball.extra_runs > 1 ? "s" : ""} off the pads of ${s}.`;
+  if (ball.extra_type === "declared") return `1D! Run declared — ${s} stays on strike, ball counted.`;
   const r = ball.runs ?? 0;
   if (r === 6) return `SIX! ${s} launches ${b} into the stands! Massive hit!`;
   if (r === 4) return `FOUR! ${s} times it sweetly off ${b} — to the fence!`;

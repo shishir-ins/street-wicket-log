@@ -10,7 +10,7 @@ import {
   type Ball, type Player, type Match, type MatchState, type Team,
 } from "@/lib/cricket";
 import {
-  ArrowLeft, Undo2, Pause, Play, Award, Activity, Share2, FileDown, MessageSquare, Users,
+  ArrowLeft, Undo2, Redo2, Pause, Play, Award, Activity, Share2, FileDown, MessageSquare, Users, Repeat,
 } from "lucide-react";
 
 export const Route = createFileRoute("/matches/$id")({
@@ -121,6 +121,10 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
   const [pendingNewBatsman, setPendingNewBatsman] = useState<{ runs: number } | null>(null);
   const [inningsBreakDialog, setInningsBreakDialog] = useState(false);
   const [target, setTarget] = useState<number | null>(state.target ?? null);
+  const [changeBowlerOpen, setChangeBowlerOpen] = useState(false);
+  const [replaceBatsman, setReplaceBatsman] = useState<null | "striker" | "nonStriker">(null);
+  // Local redo stack of undone balls (not persisted across reloads)
+  const [redoStack, setRedoStack] = useState<Array<{ ball: Ball; stateAfter: MatchState; status: string }>>([]);
 
   // Detect target from completed innings 1
   useEffect(() => {
@@ -136,7 +140,7 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
   const recordBall = useMutation({
     mutationFn: async (payload: {
       runs: number;
-      extraType?: "wide" | "no_ball" | "bye" | "leg_bye" | null;
+      extraType?: "wide" | "no_ball" | "bye" | "leg_bye" | "declared" | null;
       isWicket?: boolean;
       wicketType?: string;
       outPlayerId?: string;
@@ -164,9 +168,11 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
             ? 1
             : payload.extraType === "bye" || payload.extraType === "leg_bye"
               ? payload.runs
-              : 0;
+              : payload.extraType === "declared"
+                ? 1
+                : 0;
       const batRuns =
-        payload.extraType === "wide" || payload.extraType === "bye" || payload.extraType === "leg_bye"
+        payload.extraType === "wide" || payload.extraType === "bye" || payload.extraType === "leg_bye" || payload.extraType === "declared"
           ? 0
           : payload.runs;
 
@@ -281,6 +287,7 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
     },
     onSuccess: async (r) => {
       setExtraMod(null);
+      setRedoStack([]); // any new ball invalidates redo history
       await qc.invalidateQueries({ queryKey: ["match", match.id] });
       await qc.invalidateQueries({ queryKey: ["balls", match.id] });
       if (r?.inningsOver) {
@@ -296,6 +303,8 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
     mutationFn: async () => {
       const last = [...balls].sort((a, b) => b.ball_index - a.ball_index)[0];
       if (!last) return;
+      // capture snapshot for redo BEFORE deleting
+      const snapshot = { ball: last, stateAfter: state, status: match.status };
       // Restore previous state
       const { error: derr } = await supabase.from("balls").delete().eq("id", last.id);
       if (derr) throw derr;
@@ -316,8 +325,32 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .update({ state: prev as any, status: "live" }).eq("id", match.id);
       if (merr) throw merr;
+      return snapshot;
     },
-    onSuccess: () => {
+    onSuccess: (snap) => {
+      if (snap) setRedoStack((s) => [...s, snap]);
+      qc.invalidateQueries({ queryKey: ["match", match.id] });
+      qc.invalidateQueries({ queryKey: ["balls", match.id] });
+    },
+  });
+
+  const redoLast = useMutation({
+    mutationFn: async () => {
+      const snap = redoStack[redoStack.length - 1];
+      if (!snap) return null;
+      // Re-insert exact ball row (without id/created_at which will be regenerated)
+      const { id: _drop, created_at: _c, ...row } = snap.ball as unknown as Record<string, unknown>;
+      void _drop; void _c;
+      const { error: berr } = await supabase.from("balls").insert(row as never);
+      if (berr) throw berr;
+      const { error: merr } = await supabase.from("matches")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .update({ state: snap.stateAfter as any, status: snap.status }).eq("id", match.id);
+      if (merr) throw merr;
+      return snap;
+    },
+    onSuccess: (snap) => {
+      if (snap) setRedoStack((s) => s.slice(0, -1));
       qc.invalidateQueries({ queryKey: ["match", match.id] });
       qc.invalidateQueries({ queryKey: ["balls", match.id] });
     },
@@ -341,6 +374,11 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
   // Score click handler
   const onRun = (n: number) => {
     recordBall.mutate({ runs: n, extraType: extraMod ?? null });
+  };
+
+  const onOneDeclared = () => {
+    // 1D: 1 team run, legal ball, no strike swap, no bat run
+    recordBall.mutate({ runs: 0, extraType: "declared" });
   };
 
   const togglePause = () => {
@@ -505,10 +543,37 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
               Next number will be recorded as <span className="text-accent">{extraMod.replace("_"," ")}</span> + runs taken (tap 0 for just an extra).
             </p>
           )}
+          {/* 1D + mid-innings changes */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
+            <button disabled={isPaused || recordBall.isPending} onClick={onOneDeclared}
+              className="btn-chalk rounded-md py-3 text-sm bg-primary/20 text-primary border-primary/50 font-display tracking-wider">
+              1D
+            </button>
+            <button disabled={isPaused} onClick={() => setChangeBowlerOpen(true)}
+              className="btn-chalk rounded-md py-3 text-xs inline-flex items-center justify-center gap-1">
+              <Repeat className="h-3.5 w-3.5" /> Change bowler
+            </button>
+            <button disabled={isPaused} onClick={() => setReplaceBatsman("striker")}
+              className="btn-chalk rounded-md py-3 text-xs">Change striker</button>
+            <button disabled={isPaused} onClick={() => setReplaceBatsman("nonStriker")}
+              className="btn-chalk rounded-md py-3 text-xs">Change non-striker</button>
+          </div>
+          <div className="mt-2">
+            <button
+              onClick={() => {
+                if (!state.strikerId || !state.nonStrikerId) return;
+                setStateMut.mutate({ strikerId: state.nonStrikerId, nonStrikerId: state.strikerId });
+              }}
+              className="btn-chalk rounded-md px-3 py-2 text-xs">Swap strike</button>
+          </div>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button onClick={() => undoLast.mutate()} disabled={undoLast.isPending || balls.length===0}
               className="btn-chalk rounded-md px-3 py-2 text-sm inline-flex items-center gap-1">
               <Undo2 className="h-3.5 w-3.5" /> Undo last ball
+            </button>
+            <button onClick={() => redoLast.mutate()} disabled={redoLast.isPending || redoStack.length===0}
+              className="btn-chalk rounded-md px-3 py-2 text-sm inline-flex items-center gap-1">
+              <Redo2 className="h-3.5 w-3.5" /> Redo{redoStack.length ? ` (${redoStack.length})` : ""}
             </button>
             <button onClick={() => setExtraMod(null)} disabled={!extraMod}
               className="btn-chalk rounded-md px-3 py-2 text-sm">Clear extra</button>
@@ -560,6 +625,32 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
           byId={byId}
           onPick={(pid) => { setStateMut.mutate({ bowlerId: pid }); setPendingNextBowler(false); }}
           onSame={() => setPendingNextBowler(false)}
+        />
+      )}
+
+      {changeBowlerOpen && (
+        <NextBowlerDialog
+          availableIds={bowlingTeamWithCommon.filter((pid) => pid !== state.bowlerId)}
+          byId={byId}
+          onPick={(pid) => { setStateMut.mutate({ bowlerId: pid }); setChangeBowlerOpen(false); }}
+          onSame={() => setChangeBowlerOpen(false)}
+        />
+      )}
+
+      {replaceBatsman && (
+        <NewBatsmanDialog
+          availableIds={battingTeamWithCommon.filter((pid) =>
+            pid !== state.strikerId && pid !== state.nonStrikerId,
+          )}
+          byId={byId}
+          onPick={(pid) => {
+            const next: Partial<MatchState> = {};
+            if (replaceBatsman === "striker") next.strikerId = pid;
+            else next.nonStrikerId = pid;
+            setStateMut.mutate(next);
+            setReplaceBatsman(null);
+          }}
+          onClose={() => setReplaceBatsman(null)}
         />
       )}
 
@@ -757,9 +848,9 @@ function WicketDialog({
   );
 }
 
-function NewBatsmanDialog({ availableIds, byId, onPick }: { availableIds: string[]; byId: Record<string, Player>; onPick: (id: string) => void }) {
+function NewBatsmanDialog({ availableIds, byId, onPick, onClose }: { availableIds: string[]; byId: Record<string, Player>; onPick: (id: string) => void; onClose?: () => void }) {
   return (
-    <Modal title="Next batsman">
+    <Modal title="Next batsman" onClose={onClose}>
       {availableIds.length === 0 ? (
         <p className="font-chalk">No more batsmen available — innings will end.</p>
       ) : (
@@ -771,6 +862,7 @@ function NewBatsmanDialog({ availableIds, byId, onPick }: { availableIds: string
           ))}
         </div>
       )}
+      {onClose && <button onClick={onClose} className="text-xs text-muted-foreground mt-3 hover:text-foreground">Cancel</button>}
     </Modal>
   );
 }
