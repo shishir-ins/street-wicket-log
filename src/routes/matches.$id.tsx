@@ -650,6 +650,7 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
             setStateMut.mutate(next);
             setReplaceBatsman(null);
           }}
+          onClose={() => setReplaceBatsman(null)}
         />
       )}
 
