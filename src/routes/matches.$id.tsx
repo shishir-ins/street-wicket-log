@@ -847,9 +847,9 @@ function WicketDialog({
   );
 }
 
-function NewBatsmanDialog({ availableIds, byId, onPick }: { availableIds: string[]; byId: Record<string, Player>; onPick: (id: string) => void }) {
+function NewBatsmanDialog({ availableIds, byId, onPick, onClose }: { availableIds: string[]; byId: Record<string, Player>; onPick: (id: string) => void; onClose?: () => void }) {
   return (
-    <Modal title="Next batsman">
+    <Modal title="Next batsman" onClose={onClose}>
       {availableIds.length === 0 ? (
         <p className="font-chalk">No more batsmen available — innings will end.</p>
       ) : (
@@ -861,6 +861,7 @@ function NewBatsmanDialog({ availableIds, byId, onPick }: { availableIds: string
           ))}
         </div>
       )}
+      {onClose && <button onClick={onClose} className="text-xs text-muted-foreground mt-3 hover:text-foreground">Cancel</button>}
     </Modal>
   );
 }
