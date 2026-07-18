@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
 import type { Match } from "@/lib/cricket";
+import { useAdmin, AdminLockButton } from "@/lib/admin";
 
 export const Route = createFileRoute("/matches")({
   head: () => ({
@@ -23,6 +24,7 @@ function MatchesLayout() {
 }
 
 function MatchesList() {
+  const { isAdmin } = useAdmin();
   const matchesQ = useQuery({
     queryKey: ["matches"],
     queryFn: async () => {
@@ -41,9 +43,16 @@ function MatchesList() {
           <h1 className="text-4xl font-display tracking-widest mt-2">Match History</h1>
           <p className="font-chalk text-lg text-muted-foreground">every gully battle, saved.</p>
         </div>
-        <Link to="/matches/new" className="rounded-md bg-primary text-primary-foreground px-4 py-2 font-display tracking-wide hover:opacity-90">
-          + New match
-        </Link>
+        <div className="flex items-center gap-3">
+          {isAdmin ? (
+            <Link to="/matches/new" className="rounded-md bg-primary text-primary-foreground px-4 py-2 font-display tracking-wide hover:opacity-90">
+              + New match
+            </Link>
+          ) : (
+            <span className="text-xs text-muted-foreground font-chalk">🔒 admin only</span>
+          )}
+          <AdminLockButton />
+        </div>
       </div>
       <div className="grid gap-3">
         {matches.map((m) => (
