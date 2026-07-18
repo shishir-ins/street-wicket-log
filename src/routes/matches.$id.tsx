@@ -82,6 +82,7 @@ function MatchPage() {
 
 function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Ball[]; byId: Record<string, Player>; players: Player[] }) {
   const qc = useQueryClient();
+  const { isAdmin } = useAdmin();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const state = match.state as any as MatchState;
   // If a previous innings was declared with a cap, restrict this innings to the same number of legal balls.
@@ -443,17 +444,27 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
           <span className="inline-flex items-center gap-1 text-xs font-display tracking-widest text-destructive">
             <span className="h-2 w-2 rounded-full bg-destructive animate-pulse" /> {match.status.toUpperCase().replace("_"," ")}
           </span>
-          <button onClick={togglePause} className="btn-chalk rounded-md px-3 py-1.5 text-xs inline-flex items-center gap-1">
-            {isPaused ? <><Play className="h-3.5 w-3.5"/>Resume</> : <><Pause className="h-3.5 w-3.5"/>Break</>}
-          </button>
-          {!isInningsBreak && (
-            <button onClick={onDeclare} disabled={declareInnings.isPending}
-              className="btn-chalk rounded-md px-3 py-1.5 text-xs inline-flex items-center gap-1 text-accent border-accent/40">
-              {innings === 1 ? "Declare" : "Forfeit"}
-            </button>
+          {isAdmin && (
+            <>
+              <button onClick={togglePause} className="btn-chalk rounded-md px-3 py-1.5 text-xs inline-flex items-center gap-1">
+                {isPaused ? <><Play className="h-3.5 w-3.5"/>Resume</> : <><Pause className="h-3.5 w-3.5"/>Break</>}
+              </button>
+              {!isInningsBreak && (
+                <button onClick={onDeclare} disabled={declareInnings.isPending}
+                  className="btn-chalk rounded-md px-3 py-1.5 text-xs inline-flex items-center gap-1 text-accent border-accent/40">
+                  {innings === 1 ? "Declare" : "Forfeit"}
+                </button>
+              )}
+            </>
           )}
+          <AdminLockButton />
         </div>
       </div>
+      {!isAdmin && (
+        <div className="chalk-board p-3 mb-3 text-xs font-chalk text-muted-foreground text-center">
+          👀 Viewer mode — live score updates every 2s. Only the admin can score.
+        </div>
+      )}
 
       {/* Score header */}
       <div className="chalk-board p-5 sm:p-7 mb-4">
@@ -514,7 +525,7 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
       </div>
 
       {/* Scoring grid */}
-      {!isInningsBreak && !needsBatsman && !pendingNextBowler && (
+      {isAdmin && !isInningsBreak && !needsBatsman && !pendingNextBowler && (
         <div className="chalk-board p-4 mb-4">
           <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
             {[0,1,2,3,4,6].map((n) => (
@@ -584,7 +595,7 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
       )}
 
       {/* In-innings dialogs */}
-      {wicketDialog && (
+      {isAdmin && wicketDialog && (
         <WicketDialog
           onClose={() => setWicketDialog(false)}
           onSubmit={(d) => {
@@ -603,7 +614,7 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
         />
       )}
 
-      {(pendingNewBatsman || needsBatsman) && !isInningsBreak && (
+      {isAdmin && (pendingNewBatsman || needsBatsman) && !isInningsBreak && (
         <NewBatsmanDialog
           availableIds={battingTeamWithCommon.filter((pid) =>
             pid !== state.strikerId && pid !== state.nonStrikerId &&
@@ -620,7 +631,7 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
         />
       )}
 
-      {pendingNextBowler && (
+      {isAdmin && pendingNextBowler && (
         <NextBowlerDialog
           availableIds={bowlingTeamWithCommon.filter((pid) => pid !== state.bowlerId)}
           byId={byId}
@@ -629,7 +640,7 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
         />
       )}
 
-      {changeBowlerOpen && (
+      {isAdmin && changeBowlerOpen && (
         <NextBowlerDialog
           availableIds={bowlingTeamWithCommon.filter((pid) => pid !== state.bowlerId)}
           byId={byId}
@@ -638,7 +649,7 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
         />
       )}
 
-      {replaceBatsman && (
+      {isAdmin && replaceBatsman && (
         <NewBatsmanDialog
           availableIds={battingTeamWithCommon.filter((pid) =>
             pid !== state.strikerId && pid !== state.nonStrikerId,
@@ -655,7 +666,7 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
         />
       )}
 
-      {(isInningsBreak || inningsBreakDialog) && innings === 1 && (
+      {isAdmin && (isInningsBreak || inningsBreakDialog) && innings === 1 && (
         <InningsBreakDialog
           target={state.target ?? totals.runs + 1}
           nextBattingTeamName={bowlingTeamName}
@@ -682,15 +693,16 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
         />
       )}
 
-      {/* Mini scorecards */}
-      <ScorecardBlock title={`${battingTeamName} batting`} ids={battingTeamWithCommon} byId={byId} balls={inningsBalls} mode="bat" />
-      <ScorecardBlock title={`${bowlingTeamName} bowling`} ids={bowlingTeamWithCommon} byId={byId} balls={inningsBalls} mode="bowl" />
+      {/* Tabbed scorecards — includes 1st innings when viewing 2nd */}
+      <InningsTabs match={match} balls={balls} byId={byId} currentInnings={innings} />
 
       <PartnershipsBlock balls={inningsBalls} innings={innings} byId={byId} />
       <CommentaryFeed balls={inningsBalls} />
       <ShareToolbar match={match} balls={balls} byId={byId} />
 
-      <p className="text-xs text-muted-foreground mt-6">Team size: {battingTeamSizeForUI}. Saves automatically with every ball.</p>
+      <p className="text-xs text-muted-foreground mt-6">
+        Team size: {battingTeamSizeForUI}. {isAdmin ? "Saves automatically with every ball." : "Read-only view."}
+      </p>
     </AppShell>
   );
 }
