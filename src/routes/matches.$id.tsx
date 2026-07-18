@@ -12,6 +12,7 @@ import {
 import {
   ArrowLeft, Undo2, Redo2, Pause, Play, Award, Activity, Share2, FileDown, MessageSquare, Users, Repeat,
 } from "lucide-react";
+import { useAdmin, AdminLockButton } from "@/lib/admin";
 
 export const Route = createFileRoute("/matches/$id")({
   head: () => ({
@@ -59,7 +60,7 @@ function MatchPage() {
     const interval = setInterval(() => {
       qc.invalidateQueries({ queryKey: ["match", id] });
       qc.invalidateQueries({ queryKey: ["balls", id] });
-    }, 4000);
+    }, 2000);
     return () => clearInterval(interval);
   }, [matchQ.data, id, qc]);
 
