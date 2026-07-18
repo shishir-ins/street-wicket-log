@@ -727,6 +727,47 @@ function BallPill({ label, wicket, dim }: { label: string; wicket?: boolean; dim
   return <span className={`px-2.5 py-1 rounded-md border text-sm font-display tracking-wide ${color} ${dim ? "opacity-60" : ""}`}>{label}</span>;
 }
 
+// ---------- INNINGS TABS (crex-style batting/bowling) ----------
+function InningsTabs({ match, balls, byId, currentInnings }: { match: Match; balls: Ball[]; byId: Record<string, Player>; currentInnings?: number }) {
+  const teamA_ids = (match.team_a_players as unknown as string[]) ?? [];
+  const teamB_ids = (match.team_b_players as unknown as string[]) ?? [];
+  const withCommon = (ids: string[]) => match.common_player_id ? [...ids, match.common_player_id] : ids;
+  const battingFirst = match.batting_first as Team;
+  const t1Ids = withCommon(battingFirst === "A" ? teamA_ids : teamB_ids);
+  const t2Ids = withCommon(battingFirst === "A" ? teamB_ids : teamA_ids);
+  const t1Name = battingFirst === "A" ? match.team_a_name : match.team_b_name;
+  const t2Name = battingFirst === "A" ? match.team_b_name : match.team_a_name;
+  const i1Balls = balls.filter((b) => b.innings_number === 1);
+  const i2Balls = balls.filter((b) => b.innings_number === 2);
+  const hasI2 = i2Balls.length > 0 || currentInnings === 2;
+
+  const tabs: { key: string; label: string; el: React.ReactNode }[] = [];
+  tabs.push({ key: "i1-bat", label: `${t1Name} Bat`, el: <ScorecardBlock title={`${t1Name} batting — Innings 1`} ids={t1Ids} byId={byId} balls={i1Balls} mode="bat" /> });
+  tabs.push({ key: "i1-bowl", label: `${t2Name} Bowl`, el: <ScorecardBlock title={`${t2Name} bowling — Innings 1`} ids={t2Ids} byId={byId} balls={i1Balls} mode="bowl" /> });
+  if (hasI2) {
+    tabs.push({ key: "i2-bat", label: `${t2Name} Bat`, el: <ScorecardBlock title={`${t2Name} batting — Innings 2`} ids={t2Ids} byId={byId} balls={i2Balls} mode="bat" /> });
+    tabs.push({ key: "i2-bowl", label: `${t1Name} Bowl`, el: <ScorecardBlock title={`${t1Name} bowling — Innings 2`} ids={t1Ids} byId={byId} balls={i2Balls} mode="bowl" /> });
+  }
+  // Default to current innings batting when live
+  const defaultKey = currentInnings === 2 ? "i2-bat" : "i1-bat";
+  const [active, setActive] = useState<string>(defaultKey);
+  const activeTab = tabs.find((t) => t.key === active) ?? tabs[0];
+
+  return (
+    <div className="mt-4">
+      <div className="flex flex-wrap gap-1.5 mb-2 overflow-x-auto">
+        {tabs.map((t) => (
+          <button key={t.key} onClick={() => setActive(t.key)}
+            className={`px-3 py-1.5 rounded-md text-xs font-display tracking-wider border whitespace-nowrap ${active === t.key ? "bg-primary text-primary-foreground border-primary" : "bg-secondary text-foreground border-border hover:bg-secondary/70"}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {activeTab?.el}
+    </div>
+  );
+}
+
 function ScorecardBlock({ title, ids, byId, balls, mode }: { title: string; ids: string[]; byId: Record<string, Player>; balls: Ball[]; mode: "bat" | "bowl" }) {
   const bat = computeBatting(balls);
   const bow = computeBowling(balls);
