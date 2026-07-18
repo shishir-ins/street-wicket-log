@@ -8,6 +8,7 @@ import {
   type Ball, type Player, type Match,
 } from "@/lib/cricket";
 import { Trophy, Target, Flame, Hand, Activity, Calendar } from "lucide-react";
+import { useAdmin, AdminLockButton } from "@/lib/admin";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -20,6 +21,7 @@ export const Route = createFileRoute("/")({
 });
 
 function Dashboard() {
+  const { isAdmin } = useAdmin();
   const playersQ = useQuery({
     queryKey: ["players"],
     queryFn: async () => {
@@ -102,15 +104,23 @@ function Dashboard() {
               >
                 ● LIVE — {liveMatch.team_a_name} v {liveMatch.team_b_name}
               </Link>
-            ) : (
+            ) : isAdmin ? (
               <Link
                 to="/matches/new"
                 className="rounded-lg bg-primary text-primary-foreground px-4 py-3 font-display tracking-widest text-sm hover:opacity-90"
               >
                 START A MATCH
               </Link>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground font-chalk">viewer mode</span>
+                <AdminLockButton />
+              </div>
             )}
           </div>
+          {isAdmin && (
+            <div className="mt-3 flex justify-end"><AdminLockButton /></div>
+          )}
         </div>
       </section>
 

@@ -12,6 +12,7 @@ import {
 import {
   ArrowLeft, Undo2, Redo2, Pause, Play, Award, Activity, Share2, FileDown, MessageSquare, Users, Repeat,
 } from "lucide-react";
+import { useAdmin, AdminLockButton } from "@/lib/admin";
 
 export const Route = createFileRoute("/matches/$id")({
   head: () => ({
@@ -59,7 +60,7 @@ function MatchPage() {
     const interval = setInterval(() => {
       qc.invalidateQueries({ queryKey: ["match", id] });
       qc.invalidateQueries({ queryKey: ["balls", id] });
-    }, 4000);
+    }, 2000);
     return () => clearInterval(interval);
   }, [matchQ.data, id, qc]);
 
@@ -81,6 +82,7 @@ function MatchPage() {
 
 function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Ball[]; byId: Record<string, Player>; players: Player[] }) {
   const qc = useQueryClient();
+  const { isAdmin } = useAdmin();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const state = match.state as any as MatchState;
   // If a previous innings was declared with a cap, restrict this innings to the same number of legal balls.
@@ -442,17 +444,27 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
           <span className="inline-flex items-center gap-1 text-xs font-display tracking-widest text-destructive">
             <span className="h-2 w-2 rounded-full bg-destructive animate-pulse" /> {match.status.toUpperCase().replace("_"," ")}
           </span>
-          <button onClick={togglePause} className="btn-chalk rounded-md px-3 py-1.5 text-xs inline-flex items-center gap-1">
-            {isPaused ? <><Play className="h-3.5 w-3.5"/>Resume</> : <><Pause className="h-3.5 w-3.5"/>Break</>}
-          </button>
-          {!isInningsBreak && (
-            <button onClick={onDeclare} disabled={declareInnings.isPending}
-              className="btn-chalk rounded-md px-3 py-1.5 text-xs inline-flex items-center gap-1 text-accent border-accent/40">
-              {innings === 1 ? "Declare" : "Forfeit"}
-            </button>
+          {isAdmin && (
+            <>
+              <button onClick={togglePause} className="btn-chalk rounded-md px-3 py-1.5 text-xs inline-flex items-center gap-1">
+                {isPaused ? <><Play className="h-3.5 w-3.5"/>Resume</> : <><Pause className="h-3.5 w-3.5"/>Break</>}
+              </button>
+              {!isInningsBreak && (
+                <button onClick={onDeclare} disabled={declareInnings.isPending}
+                  className="btn-chalk rounded-md px-3 py-1.5 text-xs inline-flex items-center gap-1 text-accent border-accent/40">
+                  {innings === 1 ? "Declare" : "Forfeit"}
+                </button>
+              )}
+            </>
           )}
+          <AdminLockButton />
         </div>
       </div>
+      {!isAdmin && (
+        <div className="chalk-board p-3 mb-3 text-xs font-chalk text-muted-foreground text-center">
+          👀 Viewer mode — live score updates every 2s. Only the admin can score.
+        </div>
+      )}
 
       {/* Score header */}
       <div className="chalk-board p-5 sm:p-7 mb-4">
@@ -513,7 +525,7 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
       </div>
 
       {/* Scoring grid */}
-      {!isInningsBreak && !needsBatsman && !pendingNextBowler && (
+      {isAdmin && !isInningsBreak && !needsBatsman && !pendingNextBowler && (
         <div className="chalk-board p-4 mb-4">
           <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
             {[0,1,2,3,4,6].map((n) => (
@@ -583,7 +595,7 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
       )}
 
       {/* In-innings dialogs */}
-      {wicketDialog && (
+      {isAdmin && wicketDialog && (
         <WicketDialog
           onClose={() => setWicketDialog(false)}
           onSubmit={(d) => {
@@ -602,7 +614,7 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
         />
       )}
 
-      {(pendingNewBatsman || needsBatsman) && !isInningsBreak && (
+      {isAdmin && (pendingNewBatsman || needsBatsman) && !isInningsBreak && (
         <NewBatsmanDialog
           availableIds={battingTeamWithCommon.filter((pid) =>
             pid !== state.strikerId && pid !== state.nonStrikerId &&
@@ -619,7 +631,7 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
         />
       )}
 
-      {pendingNextBowler && (
+      {isAdmin && pendingNextBowler && (
         <NextBowlerDialog
           availableIds={bowlingTeamWithCommon.filter((pid) => pid !== state.bowlerId)}
           byId={byId}
@@ -628,7 +640,7 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
         />
       )}
 
-      {changeBowlerOpen && (
+      {isAdmin && changeBowlerOpen && (
         <NextBowlerDialog
           availableIds={bowlingTeamWithCommon.filter((pid) => pid !== state.bowlerId)}
           byId={byId}
@@ -637,7 +649,7 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
         />
       )}
 
-      {replaceBatsman && (
+      {isAdmin && replaceBatsman && (
         <NewBatsmanDialog
           availableIds={battingTeamWithCommon.filter((pid) =>
             pid !== state.strikerId && pid !== state.nonStrikerId,
@@ -654,7 +666,7 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
         />
       )}
 
-      {(isInningsBreak || inningsBreakDialog) && innings === 1 && (
+      {isAdmin && (isInningsBreak || inningsBreakDialog) && innings === 1 && (
         <InningsBreakDialog
           target={state.target ?? totals.runs + 1}
           nextBattingTeamName={bowlingTeamName}
@@ -681,15 +693,16 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
         />
       )}
 
-      {/* Mini scorecards */}
-      <ScorecardBlock title={`${battingTeamName} batting`} ids={battingTeamWithCommon} byId={byId} balls={inningsBalls} mode="bat" />
-      <ScorecardBlock title={`${bowlingTeamName} bowling`} ids={bowlingTeamWithCommon} byId={byId} balls={inningsBalls} mode="bowl" />
+      {/* Tabbed scorecards — includes 1st innings when viewing 2nd */}
+      <InningsTabs match={match} balls={balls} byId={byId} currentInnings={innings} />
 
       <PartnershipsBlock balls={inningsBalls} innings={innings} byId={byId} />
       <CommentaryFeed balls={inningsBalls} />
       <ShareToolbar match={match} balls={balls} byId={byId} />
 
-      <p className="text-xs text-muted-foreground mt-6">Team size: {battingTeamSizeForUI}. Saves automatically with every ball.</p>
+      <p className="text-xs text-muted-foreground mt-6">
+        Team size: {battingTeamSizeForUI}. {isAdmin ? "Saves automatically with every ball." : "Read-only view."}
+      </p>
     </AppShell>
   );
 }
@@ -712,6 +725,47 @@ function BallPill({ label, wicket, dim }: { label: string; wicket?: boolean; dim
     : label === "6" ? "bg-primary/30 text-primary border-primary/50"
     : "bg-secondary text-foreground border-border";
   return <span className={`px-2.5 py-1 rounded-md border text-sm font-display tracking-wide ${color} ${dim ? "opacity-60" : ""}`}>{label}</span>;
+}
+
+// ---------- INNINGS TABS (crex-style batting/bowling) ----------
+function InningsTabs({ match, balls, byId, currentInnings }: { match: Match; balls: Ball[]; byId: Record<string, Player>; currentInnings?: number }) {
+  const teamA_ids = (match.team_a_players as unknown as string[]) ?? [];
+  const teamB_ids = (match.team_b_players as unknown as string[]) ?? [];
+  const withCommon = (ids: string[]) => match.common_player_id ? [...ids, match.common_player_id] : ids;
+  const battingFirst = match.batting_first as Team;
+  const t1Ids = withCommon(battingFirst === "A" ? teamA_ids : teamB_ids);
+  const t2Ids = withCommon(battingFirst === "A" ? teamB_ids : teamA_ids);
+  const t1Name = battingFirst === "A" ? match.team_a_name : match.team_b_name;
+  const t2Name = battingFirst === "A" ? match.team_b_name : match.team_a_name;
+  const i1Balls = balls.filter((b) => b.innings_number === 1);
+  const i2Balls = balls.filter((b) => b.innings_number === 2);
+  const hasI2 = i2Balls.length > 0 || currentInnings === 2;
+
+  const tabs: { key: string; label: string; el: React.ReactNode }[] = [];
+  tabs.push({ key: "i1-bat", label: `${t1Name} Bat`, el: <ScorecardBlock title={`${t1Name} batting — Innings 1`} ids={t1Ids} byId={byId} balls={i1Balls} mode="bat" /> });
+  tabs.push({ key: "i1-bowl", label: `${t2Name} Bowl`, el: <ScorecardBlock title={`${t2Name} bowling — Innings 1`} ids={t2Ids} byId={byId} balls={i1Balls} mode="bowl" /> });
+  if (hasI2) {
+    tabs.push({ key: "i2-bat", label: `${t2Name} Bat`, el: <ScorecardBlock title={`${t2Name} batting — Innings 2`} ids={t2Ids} byId={byId} balls={i2Balls} mode="bat" /> });
+    tabs.push({ key: "i2-bowl", label: `${t1Name} Bowl`, el: <ScorecardBlock title={`${t1Name} bowling — Innings 2`} ids={t1Ids} byId={byId} balls={i2Balls} mode="bowl" /> });
+  }
+  // Default to current innings batting when live
+  const defaultKey = currentInnings === 2 ? "i2-bat" : "i1-bat";
+  const [active, setActive] = useState<string>(defaultKey);
+  const activeTab = tabs.find((t) => t.key === active) ?? tabs[0];
+
+  return (
+    <div className="mt-4">
+      <div className="flex flex-wrap gap-1.5 mb-2 overflow-x-auto">
+        {tabs.map((t) => (
+          <button key={t.key} onClick={() => setActive(t.key)}
+            className={`px-3 py-1.5 rounded-md text-xs font-display tracking-wider border whitespace-nowrap ${active === t.key ? "bg-primary text-primary-foreground border-primary" : "bg-secondary text-foreground border-border hover:bg-secondary/70"}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {activeTab?.el}
+    </div>
+  );
 }
 
 function ScorecardBlock({ title, ids, byId, balls, mode }: { title: string; ids: string[]; byId: Record<string, Player>; balls: Ball[]; mode: "bat" | "bowl" }) {

@@ -5,6 +5,33 @@ import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
 import type { Player, MatchState, Team } from "@/lib/cricket";
 import { ArrowLeft, Check } from "lucide-react";
+import { useAdmin, AdminLockButton } from "@/lib/admin";
+
+// ---------- Saved team presets (stored in localStorage, per-day) ----------
+interface SavedPreset {
+  id: string;
+  name: string;
+  savedAt: string; // ISO date
+  teamAName: string;
+  teamBName: string;
+  teamA: string[];
+  teamB: string[];
+  commonId: string;
+  overs: number;
+  battingFirst: Team;
+}
+const PRESETS_KEY = "bellamlabidi.teamPresets";
+function loadPresets(): SavedPreset[] {
+  try {
+    const raw = localStorage.getItem(PRESETS_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw) as SavedPreset[];
+    return Array.isArray(arr) ? arr : [];
+  } catch { return []; }
+}
+function savePresets(list: SavedPreset[]) {
+  try { localStorage.setItem(PRESETS_KEY, JSON.stringify(list)); } catch { /* ignore */ }
+}
 
 export const Route = createFileRoute("/matches/new")({
   head: () => ({ meta: [{ title: "New match — BELLAMLABIDI" }] }),
@@ -12,6 +39,7 @@ export const Route = createFileRoute("/matches/new")({
 });
 
 function NewMatch() {
+  const { isAdmin } = useAdmin();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -25,6 +53,36 @@ function NewMatch() {
   const [strikerId, setStrikerId] = useState("");
   const [nonStrikerId, setNonStrikerId] = useState("");
   const [bowlerId, setBowlerId] = useState("");
+
+  const [presets, setPresets] = useState<SavedPreset[]>(() => (typeof window !== "undefined" ? loadPresets() : []));
+  const [presetName, setPresetName] = useState("");
+
+  const applyPreset = (p: SavedPreset) => {
+    setTeamAName(p.teamAName); setTeamBName(p.teamBName);
+    setTeamA(p.teamA); setTeamB(p.teamB);
+    setCommonId(p.commonId); setOvers(p.overs);
+    setBattingFirst(p.battingFirst);
+  };
+  const saveCurrentPreset = () => {
+    const nm = (presetName || `${teamAName} vs ${teamBName}`).trim();
+    if (!nm) return;
+    const next: SavedPreset = {
+      id: crypto.randomUUID(), name: nm, savedAt: new Date().toISOString(),
+      teamAName, teamBName, teamA: [...teamA], teamB: [...teamB], commonId, overs, battingFirst,
+    };
+    const list = [next, ...presets].slice(0, 20);
+    setPresets(list); savePresets(list); setPresetName("");
+  };
+  const updatePreset = (id: string) => {
+    const list = presets.map((p) => p.id === id ? {
+      ...p, teamAName, teamBName, teamA: [...teamA], teamB: [...teamB], commonId, overs, battingFirst, savedAt: new Date().toISOString(),
+    } : p);
+    setPresets(list); savePresets(list);
+  };
+  const deletePreset = (id: string) => {
+    const list = presets.filter((p) => p.id !== id);
+    setPresets(list); savePresets(list);
+  };
 
   const playersQ = useQuery({
     queryKey: ["players"],
@@ -96,8 +154,19 @@ function NewMatch() {
       <Link to="/matches" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4">
         <ArrowLeft className="h-4 w-4" /> Matches
       </Link>
-      <h1 className="text-4xl font-display tracking-widest mb-2">New Match</h1>
+      <div className="flex items-center justify-between mb-2">
+        <h1 className="text-4xl font-display tracking-widest">New Match</h1>
+        <AdminLockButton />
+      </div>
       <p className="font-chalk text-muted-foreground mb-6">Step {step} of 3</p>
+
+      {!isAdmin && (
+        <div className="chalk-board p-5 mb-6">
+          <p className="font-chalk text-lg">🔒 Only the admin can start a new match. Tap the ADMIN button above to unlock.</p>
+        </div>
+      )}
+      {isAdmin && (
+      <>
 
       {players.length < 2 && (
         <div className="chalk-board p-5 mb-6">
@@ -107,6 +176,43 @@ function NewMatch() {
 
       {step === 1 && (
         <div className="space-y-5 animate-chalk-in">
+          {/* Saved presets */}
+          <div className="chalk-board p-5">
+            <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+              <h2 className="font-display tracking-widest">Saved team presets</h2>
+              <div className="flex gap-2">
+                <input placeholder="Preset name (e.g. Sunday squad)" value={presetName}
+                  onChange={(e) => setPresetName(e.target.value)}
+                  className="bg-input/40 border border-border rounded-md px-3 py-1.5 text-sm w-56" />
+                <button type="button" onClick={saveCurrentPreset}
+                  disabled={teamA.length + teamB.length === 0}
+                  className="btn-chalk rounded-md px-3 py-1.5 text-sm bg-primary/20 text-primary disabled:opacity-40">
+                  💾 Save current
+                </button>
+              </div>
+            </div>
+            {presets.length === 0 ? (
+              <p className="text-sm text-muted-foreground font-chalk">No saved presets yet. Pick teams below, then save so you can reuse them all day.</p>
+            ) : (
+              <ul className="grid sm:grid-cols-2 gap-2">
+                {presets.map((p) => (
+                  <li key={p.id} className="flex items-center gap-2 bg-background/30 border border-border rounded-md px-3 py-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="font-display tracking-wide text-sm truncate">{p.name}</div>
+                      <div className="text-[10px] text-muted-foreground truncate">
+                        {p.teamAName} ({p.teamA.length}) vs {p.teamBName} ({p.teamB.length}) · {p.overs}ov · {new Date(p.savedAt).toLocaleDateString()}
+                      </div>
+                    </div>
+                    <button onClick={() => applyPreset(p)} className="btn-chalk rounded-md px-2 py-1 text-xs">Load</button>
+                    <button onClick={() => updatePreset(p.id)} className="btn-chalk rounded-md px-2 py-1 text-xs" title="Overwrite with current selection">Update</button>
+                    <button onClick={() => { if (confirm(`Delete preset "${p.name}"?`)) deletePreset(p.id); }}
+                      className="btn-chalk rounded-md px-2 py-1 text-xs text-destructive border-destructive/40">✕</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
           <div className="chalk-board p-5">
             <h2 className="font-display tracking-widest mb-4">Teams & overs</h2>
             <div className="grid sm:grid-cols-3 gap-3">
@@ -230,6 +336,8 @@ function NewMatch() {
           </div>
           {create.error ? <p className="text-destructive text-sm">{(create.error as Error).message}</p> : null}
         </div>
+      )}
+      </>
       )}
     </AppShell>
   );
