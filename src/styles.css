@@ -63,7 +63,7 @@
 
 :root {
   /* Chalk Scoreboard theme — blackboard dark, chalk cream, grass green, brass yellow */
-  --radius: 0.5rem;
+  --radius: 1.25rem;
   --background: oklch(0.18 0.01 150);
   --foreground: oklch(0.94 0.03 85);
   --card: oklch(0.22 0.015 155);
