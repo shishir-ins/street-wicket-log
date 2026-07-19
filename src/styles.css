@@ -63,7 +63,7 @@
 
 :root {
   /* Chalk Scoreboard theme — blackboard dark, chalk cream, grass green, brass yellow */
-  --radius: 0.5rem;
+  --radius: 1.25rem;
   --background: oklch(0.18 0.01 150);
   --foreground: oklch(0.94 0.03 85);
   --card: oklch(0.22 0.015 155);
@@ -147,9 +147,12 @@
     background: var(--gradient-chalk);
     border: 1px solid oklch(0.94 0.03 85 / 0.1);
     box-shadow: var(--shadow-board);
-    border-radius: var(--radius);
+    border-radius: calc(var(--radius) + 0.5rem);
     position: relative;
     overflow: hidden;
+    transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+                box-shadow 0.35s ease,
+                border-color 0.35s ease;
   }
   .chalk-board::before {
     content: "";
@@ -159,6 +162,22 @@
     pointer-events: none;
     opacity: 0.5;
   }
+  .chalk-board::after {
+    content: "";
+    position: absolute;
+    inset: -40%;
+    background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%),
+      oklch(0.7 0.17 150 / 0.18), transparent 45%);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    pointer-events: none;
+  }
+  .chalk-board:hover {
+    transform: translateY(-3px);
+    border-color: oklch(0.7 0.17 150 / 0.35);
+    box-shadow: var(--shadow-board), 0 20px 40px -20px oklch(0.7 0.17 150 / 0.4);
+  }
+  .chalk-board:hover::after { opacity: 1; }
   .chalk-board > * { position: relative; }
 
   .score-tile {
@@ -197,4 +216,93 @@
     100% { opacity: 1; transform: translateY(0) scale(1); }
   }
   .animate-chalk-in { animation: chalk-in 0.35s ease-out both; }
+
+  /* ====== Modern cricket flourishes ====== */
+  @keyframes splash-bat {
+    0% { transform: rotate(-80deg) translateX(-30px); opacity: 0; }
+    45% { transform: rotate(-80deg) translateX(-30px); opacity: 1; }
+    60% { transform: rotate(10deg) translateX(0); }
+    75% { transform: rotate(-5deg); }
+    100% { transform: rotate(0deg); opacity: 1; }
+  }
+  @keyframes splash-ball {
+    0%, 55% { transform: translateX(0) scale(1); opacity: 0; }
+    56% { opacity: 1; }
+    62% { transform: translateX(0) scale(1.4); }
+    100% { transform: translateX(560px) translateY(-120px) rotate(720deg) scale(0.6); opacity: 0; }
+  }
+  @keyframes splash-flash {
+    0%, 55% { opacity: 0; }
+    60% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+  @keyframes splash-out {
+    0% { opacity: 1; }
+    100% { opacity: 0; visibility: hidden; }
+  }
+  @keyframes float-soft {
+    0%, 100% { transform: translateY(0) rotate(0); }
+    50% { transform: translateY(-14px) rotate(6deg); }
+  }
+  @keyframes shockwave {
+    0% { transform: scale(0); opacity: 0.9; }
+    100% { transform: scale(18); opacity: 0; }
+  }
+  @keyframes confetti-fall {
+    0% { transform: translateY(-20vh) rotate(0); opacity: 1; }
+    100% { transform: translateY(110vh) rotate(720deg); opacity: 0.2; }
+  }
+  @keyframes boundary-pop {
+    0% { transform: scale(0.4) rotate(-8deg); opacity: 0; }
+    30% { transform: scale(1.15) rotate(2deg); opacity: 1; }
+    70% { transform: scale(1) rotate(-1deg); opacity: 1; }
+    100% { transform: scale(1.05) rotate(0); opacity: 0; }
+  }
+  @keyframes glow-pulse {
+    0%, 100% { box-shadow: 0 0 30px oklch(0.7 0.17 150 / 0.3); }
+    50% { box-shadow: 0 0 60px oklch(0.7 0.17 150 / 0.6); }
+  }
+
+  .cursor-ball {
+    position: fixed;
+    top: 0; left: 0;
+    width: 22px; height: 22px;
+    border-radius: 999px;
+    background:
+      radial-gradient(circle at 35% 30%, oklch(0.75 0.2 25), oklch(0.42 0.18 25) 70%);
+    box-shadow: 0 0 24px oklch(0.62 0.22 25 / 0.55), inset -3px -4px 6px oklch(0.2 0.05 25 / 0.6);
+    pointer-events: none;
+    z-index: 9998;
+    transform: translate(-50%, -50%);
+    transition: transform 0.08s linear, width 0.2s ease, height 0.2s ease;
+    mix-blend-mode: normal;
+  }
+  .cursor-ball::before {
+    content: "";
+    position: absolute; inset: 4px;
+    border-radius: 999px;
+    border-top: 1px dashed oklch(0.94 0.03 85 / 0.75);
+    transform: rotate(28deg);
+  }
+  .cursor-trail {
+    position: fixed;
+    width: 8px; height: 8px;
+    border-radius: 999px;
+    background: oklch(0.62 0.22 25 / 0.4);
+    pointer-events: none;
+    z-index: 9997;
+    transform: translate(-50%, -50%);
+  }
+  @media (hover: none) { .cursor-ball, .cursor-trail { display: none; } }
+
+  .ambient-icon {
+    position: fixed;
+    pointer-events: none;
+    opacity: 0.06;
+    animation: float-soft 9s ease-in-out infinite;
+    z-index: 0;
+    color: var(--chalk);
+  }
+
+  .page-fade { animation: chalk-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
 }

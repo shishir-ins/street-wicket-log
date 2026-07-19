@@ -375,6 +375,9 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
 
   // Score click handler
   const onRun = (n: number) => {
+    if ((n === 4 || n === 6) && !extraMod) {
+      window.dispatchEvent(new CustomEvent("boundary", { detail: { runs: n } }));
+    }
     recordBall.mutate({ runs: n, extraType: extraMod ?? null });
   };
 

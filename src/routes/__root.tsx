@@ -11,6 +11,10 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { SplashIntro } from "@/components/SplashIntro";
+import { CursorBall } from "@/components/CursorBall";
+import { BoundaryFx } from "@/components/BoundaryFx";
+import { AmbientBackdrop } from "@/components/AmbientBackdrop";
 
 function NotFoundComponent() {
   return (
@@ -125,6 +129,10 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <SplashIntro />
+      <AmbientBackdrop />
+      <CursorBall />
+      <BoundaryFx />
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
     </QueryClientProvider>
