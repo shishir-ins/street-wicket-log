@@ -1069,16 +1069,18 @@ function AddPlayerDialog({
       // Build the update payload; strip existing membership so a re-assign works cleanly.
       const cleanA = teamA.filter((x) => x !== playerId);
       const cleanB = teamB.filter((x) => x !== playerId);
-      const patch: Record<string, unknown> = {
-        team_a_players: cleanA,
-        team_b_players: cleanB,
-        common_player_id: match.common_player_id === playerId ? null : match.common_player_id,
-      };
-      if (team === "A") patch.team_a_players = [...cleanA, playerId];
-      if (team === "B") patch.team_b_players = [...cleanB, playerId];
-      if (team === "J") patch.common_player_id = playerId;
+      let nextA = cleanA;
+      let nextB = cleanB;
+      let nextJoker: string | null = match.common_player_id === playerId ? null : match.common_player_id;
+      if (team === "A") nextA = [...cleanA, playerId];
+      else if (team === "B") nextB = [...cleanB, playerId];
+      else nextJoker = playerId;
 
-      const { error } = await supabase.from("matches").update(patch).eq("id", match.id);
+      const { error } = await supabase.from("matches").update({
+        team_a_players: nextA as unknown as never,
+        team_b_players: nextB as unknown as never,
+        common_player_id: nextJoker,
+      }).eq("id", match.id);
       if (error) throw error;
       await onDone();
     } catch (e) {
