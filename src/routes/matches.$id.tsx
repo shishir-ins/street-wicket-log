@@ -10,9 +10,10 @@ import {
   type Ball, type Player, type Match, type MatchState, type Team,
 } from "@/lib/cricket";
 import {
-  ArrowLeft, Undo2, Redo2, Pause, Play, Award, Activity, Share2, FileDown, MessageSquare, Users, Repeat,
+  ArrowLeft, Undo2, Redo2, Pause, Play, Award, Activity, Share2, FileDown, MessageSquare, Users, Repeat, UserPlus,
 } from "lucide-react";
 import { useAdmin, AdminLockButton } from "@/lib/admin";
+import { PlayerAvatar, PlayerNameRow } from "@/components/PlayerAvatar";
 
 export const Route = createFileRoute("/matches/$id")({
   head: () => ({
@@ -99,11 +100,18 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
 
   const battingPlayers = (state.battingTeam === "A" ? match.team_a_players : match.team_b_players) as unknown as string[];
   const bowlingPlayers = (state.bowlingTeam === "A" ? match.team_a_players : match.team_b_players) as unknown as string[];
-  const battingTeamWithCommon = match.common_player_id ? [...battingPlayers, match.common_player_id] : battingPlayers;
-  const bowlingTeamWithCommon = match.common_player_id ? [...bowlingPlayers, match.common_player_id] : bowlingPlayers;
+  // Dedupe: the joker may already be persisted in the team array from older matches, so we always uniq here.
+  const battingTeamWithCommon = Array.from(new Set(
+    match.common_player_id ? [...battingPlayers, match.common_player_id] : battingPlayers,
+  ));
+  const bowlingTeamWithCommon = Array.from(new Set(
+    match.common_player_id ? [...bowlingPlayers, match.common_player_id] : bowlingPlayers,
+  ));
   const battingTeamName = state.battingTeam === "A" ? match.team_a_name : match.team_b_name;
   const bowlingTeamName = state.bowlingTeam === "A" ? match.team_a_name : match.team_b_name;
   const battingTeamSize = battingTeamWithCommon.length;
+  const jokerId = match.common_player_id ?? null;
+  const isJoker = (id?: string | null) => !!id && !!jokerId && id === jokerId;
 
   const batting = computeBatting(balls);
   const bowling = computeBowling(balls);
@@ -125,6 +133,7 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
   const [target, setTarget] = useState<number | null>(state.target ?? null);
   const [changeBowlerOpen, setChangeBowlerOpen] = useState(false);
   const [replaceBatsman, setReplaceBatsman] = useState<null | "striker" | "nonStriker">(null);
+  const [addPlayerOpen, setAddPlayerOpen] = useState(false);
   // Local redo stack of undone balls (not persisted across reloads)
   const [redoStack, setRedoStack] = useState<Array<{ ball: Ball; stateAfter: MatchState; status: string }>>([]);
 
@@ -497,11 +506,15 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
 
       {/* Batsmen + Bowler */}
       <div className="grid md:grid-cols-3 gap-3 mb-4">
-        <BatsmanCard label="Striker*" player={striker} line={sBat} />
-        <BatsmanCard label="Non-striker" player={nonStriker} line={nBat} />
+        <BatsmanCard label="Striker*" player={striker} line={sBat} isJoker={isJoker(striker?.id)} />
+        <BatsmanCard label="Non-striker" player={nonStriker} line={nBat} isJoker={isJoker(nonStriker?.id)} />
         <div className="chalk-board p-4">
           <div className="text-xs font-display tracking-wider text-muted-foreground">BOWLER</div>
-          <div className="font-display text-2xl tracking-wide mt-0.5">{bowler?.name ?? "—"}</div>
+          <div className="mt-0.5 flex items-center gap-2">
+            <PlayerAvatar player={bowler} size="md" isJoker={isJoker(bowler?.id)} />
+            <span className={`font-display text-2xl tracking-wide truncate ${isJoker(bowler?.id) ? "joker-text" : ""}`}>{bowler?.name ?? "—"}</span>
+            {isJoker(bowler?.id) && <span className="text-[10px] font-display tracking-widest px-1.5 py-0.5 rounded-md bg-accent/20 text-accent border border-accent/40">🃏</span>}
+          </div>
           <div className="text-sm text-muted-foreground mt-1 font-chalk">
             {bBow ? `${Math.floor(bBow.legalBalls/6)}.${bBow.legalBalls%6}-${bBow.maidens}-${bBow.runsConceded}-${bBow.wickets} · Eco ${bBow.economy.toFixed(2)}` : "—"}
           </div>
@@ -592,6 +605,10 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
             </button>
             <button onClick={() => setExtraMod(null)} disabled={!extraMod}
               className="btn-chalk rounded-md px-3 py-2 text-sm">Clear extra</button>
+            <button onClick={() => setAddPlayerOpen(true)}
+              className="btn-chalk rounded-md px-3 py-2 text-sm inline-flex items-center gap-1 text-primary border-primary/40">
+              <UserPlus className="h-3.5 w-3.5" /> Add player
+            </button>
           </div>
           {recordBall.error ? <p className="text-destructive text-sm mt-2">{(recordBall.error as Error).message}</p> : null}
         </div>
@@ -614,6 +631,7 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
           }}
           striker={striker} nonStriker={nonStriker}
           fielders={bowlingTeamWithCommon.map((id) => byId[id]).filter(Boolean) as Player[]}
+          jokerId={jokerId}
         />
       )}
 
@@ -624,6 +642,7 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
             !(state.outBatsmen ?? []).includes(pid),
           )}
           byId={byId}
+          jokerId={jokerId}
           onPick={(pid) => {
             const next: Partial<MatchState> = {};
             if (!state.strikerId) next.strikerId = pid;
@@ -638,6 +657,7 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
         <NextBowlerDialog
           availableIds={bowlingTeamWithCommon.filter((pid) => pid !== state.bowlerId)}
           byId={byId}
+          jokerId={jokerId}
           onPick={(pid) => { setStateMut.mutate({ bowlerId: pid }); setPendingNextBowler(false); }}
           onSame={() => setPendingNextBowler(false)}
         />
@@ -647,6 +667,7 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
         <NextBowlerDialog
           availableIds={bowlingTeamWithCommon.filter((pid) => pid !== state.bowlerId)}
           byId={byId}
+          jokerId={jokerId}
           onPick={(pid) => { setStateMut.mutate({ bowlerId: pid }); setChangeBowlerOpen(false); }}
           onSame={() => setChangeBowlerOpen(false)}
         />
@@ -658,6 +679,7 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
             pid !== state.strikerId && pid !== state.nonStrikerId,
           )}
           byId={byId}
+          jokerId={jokerId}
           onPick={(pid) => {
             const next: Partial<MatchState> = {};
             if (replaceBatsman === "striker") next.strikerId = pid;
@@ -669,6 +691,19 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
         />
       )}
 
+      {isAdmin && addPlayerOpen && (
+        <AddPlayerDialog
+          match={match}
+          players={players}
+          onClose={() => setAddPlayerOpen(false)}
+          onDone={async () => {
+            setAddPlayerOpen(false);
+            await qc.invalidateQueries({ queryKey: ["match", match.id] });
+            await qc.invalidateQueries({ queryKey: ["players"] });
+          }}
+        />
+      )}
+
       {isAdmin && (isInningsBreak || inningsBreakDialog) && innings === 1 && (
         <InningsBreakDialog
           target={state.target ?? totals.runs + 1}
@@ -676,6 +711,7 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
           battingIds={bowlingTeamWithCommon}
           bowlingIds={battingTeamWithCommon}
           byId={byId}
+          jokerId={jokerId}
           onStart={(picks) => {
             const newState: MatchState = {
               ...state,
@@ -710,11 +746,15 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
   );
 }
 
-function BatsmanCard({ label, player, line }: { label: string; player?: Player; line?: { runs: number; ballsFaced: number; fours: number; sixes: number; strikeRate: number } }) {
+function BatsmanCard({ label, player, line, isJoker = false }: { label: string; player?: Player; line?: { runs: number; ballsFaced: number; fours: number; sixes: number; strikeRate: number }; isJoker?: boolean }) {
   return (
     <div className="chalk-board p-4">
       <div className="text-xs font-display tracking-wider text-muted-foreground">{label.toUpperCase()}</div>
-      <div className="font-display text-2xl tracking-wide mt-0.5">{player?.name ?? "—"}</div>
+      <div className="mt-0.5 flex items-center gap-2">
+        <PlayerAvatar player={player} size="md" isJoker={isJoker} />
+        <span className={`font-display text-2xl tracking-wide truncate ${isJoker ? "joker-text" : ""}`}>{player?.name ?? "—"}</span>
+        {isJoker && <span className="text-[10px] font-display tracking-widest px-1.5 py-0.5 rounded-md bg-accent/20 text-accent border border-accent/40">🃏</span>}
+      </div>
       <div className="text-sm text-muted-foreground mt-1 font-chalk">
         {line ? `${line.runs} (${line.ballsFaced})  ·  SR ${line.strikeRate.toFixed(1)}  ·  ${line.fours}×4 ${line.sixes}×6` : "0 (0)"}
       </div>
@@ -734,7 +774,7 @@ function BallPill({ label, wicket, dim }: { label: string; wicket?: boolean; dim
 function InningsTabs({ match, balls, byId, currentInnings }: { match: Match; balls: Ball[]; byId: Record<string, Player>; currentInnings?: number }) {
   const teamA_ids = (match.team_a_players as unknown as string[]) ?? [];
   const teamB_ids = (match.team_b_players as unknown as string[]) ?? [];
-  const withCommon = (ids: string[]) => match.common_player_id ? [...ids, match.common_player_id] : ids;
+  const withCommon = (ids: string[]) => Array.from(new Set(match.common_player_id ? [...ids, match.common_player_id] : ids));
   const battingFirst = match.batting_first as Team;
   const t1Ids = withCommon(battingFirst === "A" ? teamA_ids : teamB_ids);
   const t2Ids = withCommon(battingFirst === "A" ? teamB_ids : teamA_ids);
@@ -745,11 +785,12 @@ function InningsTabs({ match, balls, byId, currentInnings }: { match: Match; bal
   const hasI2 = i2Balls.length > 0 || currentInnings === 2;
 
   const tabs: { key: string; label: string; el: React.ReactNode }[] = [];
-  tabs.push({ key: "i1-bat", label: `${t1Name} Bat`, el: <ScorecardBlock title={`${t1Name} batting — Innings 1`} ids={t1Ids} byId={byId} balls={i1Balls} mode="bat" /> });
-  tabs.push({ key: "i1-bowl", label: `${t2Name} Bowl`, el: <ScorecardBlock title={`${t2Name} bowling — Innings 1`} ids={t2Ids} byId={byId} balls={i1Balls} mode="bowl" /> });
+  const jokerId = match.common_player_id ?? null;
+  tabs.push({ key: "i1-bat", label: `${t1Name} Bat`, el: <ScorecardBlock title={`${t1Name} batting — Innings 1`} ids={t1Ids} byId={byId} balls={i1Balls} mode="bat" jokerId={jokerId} /> });
+  tabs.push({ key: "i1-bowl", label: `${t2Name} Bowl`, el: <ScorecardBlock title={`${t2Name} bowling — Innings 1`} ids={t2Ids} byId={byId} balls={i1Balls} mode="bowl" jokerId={jokerId} /> });
   if (hasI2) {
-    tabs.push({ key: "i2-bat", label: `${t2Name} Bat`, el: <ScorecardBlock title={`${t2Name} batting — Innings 2`} ids={t2Ids} byId={byId} balls={i2Balls} mode="bat" /> });
-    tabs.push({ key: "i2-bowl", label: `${t1Name} Bowl`, el: <ScorecardBlock title={`${t1Name} bowling — Innings 2`} ids={t1Ids} byId={byId} balls={i2Balls} mode="bowl" /> });
+    tabs.push({ key: "i2-bat", label: `${t2Name} Bat`, el: <ScorecardBlock title={`${t2Name} batting — Innings 2`} ids={t2Ids} byId={byId} balls={i2Balls} mode="bat" jokerId={jokerId} /> });
+    tabs.push({ key: "i2-bowl", label: `${t1Name} Bowl`, el: <ScorecardBlock title={`${t1Name} bowling — Innings 2`} ids={t1Ids} byId={byId} balls={i2Balls} mode="bowl" jokerId={jokerId} /> });
   }
   // Default to current innings batting when live
   const defaultKey = currentInnings === 2 ? "i2-bat" : "i1-bat";
@@ -771,9 +812,10 @@ function InningsTabs({ match, balls, byId, currentInnings }: { match: Match; bal
   );
 }
 
-function ScorecardBlock({ title, ids, byId, balls, mode }: { title: string; ids: string[]; byId: Record<string, Player>; balls: Ball[]; mode: "bat" | "bowl" }) {
+function ScorecardBlock({ title, ids, byId, balls, mode, jokerId }: { title: string; ids: string[]; byId: Record<string, Player>; balls: Ball[]; mode: "bat" | "bowl"; jokerId?: string | null }) {
   const bat = computeBatting(balls);
   const bow = computeBowling(balls);
+  const uniqIds = Array.from(new Set(ids));
   return (
     <div className="chalk-board p-4 mt-4">
       <h3 className="font-display tracking-widest mb-3">{title}</h3>
@@ -784,12 +826,14 @@ function ScorecardBlock({ title, ids, byId, balls, mode }: { title: string; ids:
               <tr><th className="text-left py-1">Player</th><th>R</th><th>B</th><th>4s</th><th>6s</th><th>SR</th><th className="text-right">Status</th></tr>
             </thead>
             <tbody>
-              {ids.map((id) => {
+              {uniqIds.map((id) => {
                 const l = bat[id];
                 if (!l) return null;
                 return (
                   <tr key={id} className="border-t border-border/30">
-                    <td className="py-1.5">{byId[id]?.name ?? "?"}</td>
+                    <td className="py-1.5">
+                      <PlayerNameRow player={byId[id]} isJoker={!!jokerId && id === jokerId} size="sm" />
+                    </td>
                     <td className="text-center font-medium">{l.runs}</td>
                     <td className="text-center text-muted-foreground">{l.ballsFaced}</td>
                     <td className="text-center text-muted-foreground">{l.fours}</td>
@@ -809,12 +853,14 @@ function ScorecardBlock({ title, ids, byId, balls, mode }: { title: string; ids:
               <tr><th className="text-left py-1">Bowler</th><th>O</th><th>M</th><th>R</th><th>W</th><th>Eco</th></tr>
             </thead>
             <tbody>
-              {ids.map((id) => {
+              {uniqIds.map((id) => {
                 const l = bow[id];
                 if (!l) return null;
                 return (
                   <tr key={id} className="border-t border-border/30">
-                    <td className="py-1.5">{byId[id]?.name ?? "?"}</td>
+                    <td className="py-1.5">
+                      <PlayerNameRow player={byId[id]} isJoker={!!jokerId && id === jokerId} size="sm" />
+                    </td>
                     <td className="text-center">{Math.floor(l.legalBalls/6)}.{l.legalBalls%6}</td>
                     <td className="text-center">{l.maidens}</td>
                     <td className="text-center">{l.runsConceded}</td>
@@ -845,11 +891,11 @@ function Modal({ children, onClose, title }: { children: React.ReactNode; onClos
 }
 
 function WicketDialog({
-  onClose, onSubmit, striker, nonStriker, fielders,
+  onClose, onSubmit, striker, nonStriker, fielders, jokerId,
 }: {
   onClose: () => void;
   onSubmit: (d: { type: string; outPlayerId: string; fielderId: string; runs: number }) => void;
-  striker?: Player; nonStriker?: Player; fielders: Player[];
+  striker?: Player; nonStriker?: Player; fielders: Player[]; jokerId?: string | null;
 }) {
   const types = ["Bowled","Caught","LBW","Run Out","Stumped","Hit Wicket"];
   const [type, setType] = useState("Bowled");
@@ -872,8 +918,8 @@ function WicketDialog({
         <div>
           <label className="text-xs text-muted-foreground font-display tracking-wider">WHO IS OUT</label>
           <select className="w-full mt-1 bg-input/40 border border-border rounded-md px-3 py-2" value={outId} onChange={(e) => setOutId(e.target.value)}>
-            {striker && <option value={striker.id}>{striker.name} (striker)</option>}
-            {nonStriker && <option value={nonStriker.id}>{nonStriker.name} (non-striker)</option>}
+            {striker && <option value={striker.id}>{jokerId && striker.id === jokerId ? "🃏 " : ""}{striker.name} (striker)</option>}
+            {nonStriker && <option value={nonStriker.id}>{jokerId && nonStriker.id === jokerId ? "🃏 " : ""}{nonStriker.name} (non-striker)</option>}
           </select>
         </div>
         {needsFielder && (
@@ -881,7 +927,7 @@ function WicketDialog({
             <label className="text-xs text-muted-foreground font-display tracking-wider">FIELDER</label>
             <select className="w-full mt-1 bg-input/40 border border-border rounded-md px-3 py-2" value={fielderId} onChange={(e) => setFielderId(e.target.value)}>
               <option value="">— pick fielder —</option>
-              {fielders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+              {fielders.map((f) => <option key={f.id} value={f.id}>{jokerId && f.id === jokerId ? "🃏 " : ""}{f.name}</option>)}
             </select>
           </div>
         )}
@@ -905,16 +951,18 @@ function WicketDialog({
   );
 }
 
-function NewBatsmanDialog({ availableIds, byId, onPick, onClose }: { availableIds: string[]; byId: Record<string, Player>; onPick: (id: string) => void; onClose?: () => void }) {
+function NewBatsmanDialog({ availableIds, byId, onPick, onClose, jokerId }: { availableIds: string[]; byId: Record<string, Player>; onPick: (id: string) => void; onClose?: () => void; jokerId?: string | null }) {
+  const uniq = Array.from(new Set(availableIds));
   return (
     <Modal title="Next batsman" onClose={onClose}>
-      {availableIds.length === 0 ? (
+      {uniq.length === 0 ? (
         <p className="font-chalk">No more batsmen available — innings will end.</p>
       ) : (
         <div className="grid grid-cols-2 gap-2">
-          {availableIds.map((id) => (
-            <button key={id} onClick={() => onPick(id)} className="btn-chalk rounded-md py-3 text-sm">
-              {byId[id]?.name ?? "?"}
+          {uniq.map((id) => (
+            <button key={id} onClick={() => onPick(id)} className={`btn-chalk rounded-md py-3 text-sm inline-flex items-center gap-2 justify-center ${jokerId && id === jokerId ? "border-accent/60" : ""}`}>
+              <PlayerAvatar player={byId[id]} size="sm" isJoker={!!jokerId && id === jokerId} />
+              <span className={jokerId && id === jokerId ? "joker-text" : ""}>{byId[id]?.name ?? "?"}</span>
             </button>
           ))}
         </div>
@@ -924,13 +972,15 @@ function NewBatsmanDialog({ availableIds, byId, onPick, onClose }: { availableId
   );
 }
 
-function NextBowlerDialog({ availableIds, byId, onPick, onSame }: { availableIds: string[]; byId: Record<string, Player>; onPick: (id: string) => void; onSame: () => void }) {
+function NextBowlerDialog({ availableIds, byId, onPick, onSame, jokerId }: { availableIds: string[]; byId: Record<string, Player>; onPick: (id: string) => void; onSame: () => void; jokerId?: string | null }) {
+  const uniq = Array.from(new Set(availableIds));
   return (
     <Modal title="Next bowler">
       <div className="grid grid-cols-2 gap-2">
-        {availableIds.map((id) => (
-          <button key={id} onClick={() => onPick(id)} className="btn-chalk rounded-md py-3 text-sm">
-            {byId[id]?.name ?? "?"}
+        {uniq.map((id) => (
+          <button key={id} onClick={() => onPick(id)} className={`btn-chalk rounded-md py-3 text-sm inline-flex items-center gap-2 justify-center ${jokerId && id === jokerId ? "border-accent/60" : ""}`}>
+            <PlayerAvatar player={byId[id]} size="sm" isJoker={!!jokerId && id === jokerId} />
+            <span className={jokerId && id === jokerId ? "joker-text" : ""}>{byId[id]?.name ?? "?"}</span>
           </button>
         ))}
       </div>
@@ -940,20 +990,23 @@ function NextBowlerDialog({ availableIds, byId, onPick, onSame }: { availableIds
 }
 
 function InningsBreakDialog({
-  target, nextBattingTeamName, battingIds, bowlingIds, byId, onStart,
+  target, nextBattingTeamName, battingIds, bowlingIds, byId, onStart, jokerId,
 }: {
   target: number; nextBattingTeamName: string; battingIds: string[]; bowlingIds: string[]; byId: Record<string, Player>;
   onStart: (picks: { strikerId: string; nonStrikerId: string; bowlerId: string }) => void;
+  jokerId?: string | null;
 }) {
   const [strikerId, setStrikerId] = useState("");
   const [nonStrikerId, setNonStrikerId] = useState("");
   const [bowlerId, setBowlerId] = useState("");
+  const uniqBat = Array.from(new Set(battingIds));
+  const uniqBowl = Array.from(new Set(bowlingIds));
   return (
     <Modal title={`Innings break — ${nextBattingTeamName} needs ${target}`}>
       <div className="space-y-3">
-        <PlayerPick label="Striker" value={strikerId} onChange={setStrikerId} ids={battingIds.filter((x) => x !== nonStrikerId)} byId={byId} />
-        <PlayerPick label="Non-striker" value={nonStrikerId} onChange={setNonStrikerId} ids={battingIds.filter((x) => x !== strikerId)} byId={byId} />
-        <PlayerPick label="Opening bowler" value={bowlerId} onChange={setBowlerId} ids={bowlingIds} byId={byId} />
+        <PlayerPick label="Striker" value={strikerId} onChange={setStrikerId} ids={uniqBat.filter((x) => x !== nonStrikerId)} byId={byId} jokerId={jokerId} />
+        <PlayerPick label="Non-striker" value={nonStrikerId} onChange={setNonStrikerId} ids={uniqBat.filter((x) => x !== strikerId)} byId={byId} jokerId={jokerId} />
+        <PlayerPick label="Opening bowler" value={bowlerId} onChange={setBowlerId} ids={uniqBowl} byId={byId} jokerId={jokerId} />
         <div className="flex justify-end">
           <button disabled={!strikerId || !nonStrikerId || !bowlerId}
             onClick={() => onStart({ strikerId, nonStrikerId, bowlerId })}
@@ -966,15 +1019,129 @@ function InningsBreakDialog({
   );
 }
 
-function PlayerPick({ label, value, onChange, ids, byId }: { label: string; value: string; onChange: (v: string) => void; ids: string[]; byId: Record<string, Player> }) {
+function PlayerPick({ label, value, onChange, ids, byId, jokerId }: { label: string; value: string; onChange: (v: string) => void; ids: string[]; byId: Record<string, Player>; jokerId?: string | null }) {
   return (
     <div>
       <label className="text-xs text-muted-foreground font-display tracking-wider">{label.toUpperCase()}</label>
       <select className="w-full mt-1 bg-input/40 border border-border rounded-md px-3 py-2" value={value} onChange={(e) => onChange(e.target.value)}>
         <option value="">— select —</option>
-        {ids.map((id) => <option key={id} value={id}>{byId[id]?.name ?? "?"}</option>)}
+        {ids.map((id) => <option key={id} value={id}>{jokerId && id === jokerId ? "🃏 " : ""}{byId[id]?.name ?? "?"}</option>)}
       </select>
     </div>
+  );
+}
+
+// ---------- ADD PLAYER MID-MATCH ----------
+function AddPlayerDialog({
+  match, players, onClose, onDone,
+}: {
+  match: Match;
+  players: Player[];
+  onClose: () => void;
+  onDone: () => void | Promise<void>;
+}) {
+  const [mode, setMode] = useState<"existing" | "new">("existing");
+  const [existingId, setExistingId] = useState("");
+  const [newName, setNewName] = useState("");
+  const [team, setTeam] = useState<"A" | "B" | "J">("A");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const teamA = (match.team_a_players as unknown as string[]) ?? [];
+  const teamB = (match.team_b_players as unknown as string[]) ?? [];
+  const assigned = new Set<string>([...teamA, ...teamB, ...(match.common_player_id ? [match.common_player_id] : [])]);
+  const available = players.filter((p) => !assigned.has(p.id));
+
+  const submit = async () => {
+    setErr(null);
+    setBusy(true);
+    try {
+      let playerId = existingId;
+      if (mode === "new") {
+        const nm = newName.trim();
+        if (!nm) throw new Error("Enter a player name");
+        const { data, error } = await supabase.from("players").insert({ name: nm, role: "All-rounder" }).select("id").single();
+        if (error) throw error;
+        playerId = data.id as string;
+      }
+      if (!playerId) throw new Error("Pick a player");
+
+      // Build the update payload; strip existing membership so a re-assign works cleanly.
+      const cleanA = teamA.filter((x) => x !== playerId);
+      const cleanB = teamB.filter((x) => x !== playerId);
+      const patch: Record<string, unknown> = {
+        team_a_players: cleanA,
+        team_b_players: cleanB,
+        common_player_id: match.common_player_id === playerId ? null : match.common_player_id,
+      };
+      if (team === "A") patch.team_a_players = [...cleanA, playerId];
+      if (team === "B") patch.team_b_players = [...cleanB, playerId];
+      if (team === "J") patch.common_player_id = playerId;
+
+      const { error } = await supabase.from("matches").update(patch).eq("id", match.id);
+      if (error) throw error;
+      await onDone();
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal title="Add player to match" onClose={onClose}>
+      <div className="space-y-4">
+        <div className="flex gap-2">
+          <button onClick={() => setMode("existing")} className={`btn-chalk rounded-md px-3 py-1.5 text-xs flex-1 ${mode === "existing" ? "bg-primary/20 text-primary border-primary/50" : ""}`}>Pick existing</button>
+          <button onClick={() => setMode("new")} className={`btn-chalk rounded-md px-3 py-1.5 text-xs flex-1 ${mode === "new" ? "bg-primary/20 text-primary border-primary/50" : ""}`}>New player</button>
+        </div>
+
+        {mode === "existing" ? (
+          <div>
+            <label className="text-xs text-muted-foreground font-display tracking-wider">PLAYER</label>
+            <select className="w-full mt-1 bg-input/40 border border-border rounded-md px-3 py-2" value={existingId} onChange={(e) => setExistingId(e.target.value)}>
+              <option value="">— pick a player —</option>
+              {available.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+            {available.length === 0 && <p className="text-xs text-muted-foreground mt-1 font-chalk">Everyone in the squad is already in the match. Create a new one instead.</p>}
+          </div>
+        ) : (
+          <div>
+            <label className="text-xs text-muted-foreground font-display tracking-wider">NEW PLAYER NAME</label>
+            <input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)}
+              className="w-full mt-1 bg-input/40 border border-border rounded-md px-3 py-2" placeholder="e.g. Rahul" />
+          </div>
+        )}
+
+        <div>
+          <label className="text-xs text-muted-foreground font-display tracking-wider">ASSIGN TO</label>
+          <div className="grid grid-cols-3 gap-2 mt-1">
+            <button onClick={() => setTeam("A")} className={`btn-chalk rounded-md py-3 text-sm ${team === "A" ? "bg-primary/20 text-primary border-primary/50" : ""}`}>
+              <div className="font-display tracking-wider text-xs opacity-70">TEAM</div>
+              <div className="truncate">{match.team_a_name}</div>
+            </button>
+            <button onClick={() => setTeam("B")} className={`btn-chalk rounded-md py-3 text-sm ${team === "B" ? "bg-primary/20 text-primary border-primary/50" : ""}`}>
+              <div className="font-display tracking-wider text-xs opacity-70">TEAM</div>
+              <div className="truncate">{match.team_b_name}</div>
+            </button>
+            <button onClick={() => setTeam("J")} className={`btn-chalk rounded-md py-3 text-sm relative overflow-hidden ${team === "J" ? "border-accent/60" : ""}`}>
+              <span className={`joker-text font-display tracking-widest ${team === "J" ? "" : "opacity-80"}`}>🃏 JOKER</span>
+              <div className="text-[10px] text-muted-foreground mt-0.5">plays both sides</div>
+            </button>
+          </div>
+        </div>
+
+        {err && <p className="text-destructive text-sm">{err}</p>}
+
+        <div className="flex justify-end gap-2">
+          <button onClick={onClose} className="btn-chalk rounded-md px-4 py-2 text-sm">Cancel</button>
+          <button onClick={submit} disabled={busy || (mode === "existing" ? !existingId : !newName.trim())}
+            className="rounded-md bg-primary text-primary-foreground px-4 py-2 text-sm font-display tracking-wide disabled:opacity-50">
+            {busy ? "Adding…" : "Add player"}
+          </button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
@@ -986,13 +1153,14 @@ function FinalScorecard({ match, balls, byId }: { match: Match; balls: Ball[]; b
 
   const teamA_ids = (match.team_a_players as unknown as string[]) ?? [];
   const teamB_ids = (match.team_b_players as unknown as string[]) ?? [];
-  const allWithCommon = (ids: string[]) => match.common_player_id ? [...ids, match.common_player_id] : ids;
+  const allWithCommon = (ids: string[]) => Array.from(new Set(match.common_player_id ? [...ids, match.common_player_id] : ids));
 
   const battingFirstTeam = match.batting_first as Team;
   const team1Ids = allWithCommon(battingFirstTeam === "A" ? teamA_ids : teamB_ids);
   const team2Ids = allWithCommon(battingFirstTeam === "A" ? teamB_ids : teamA_ids);
   const team1Name = battingFirstTeam === "A" ? match.team_a_name : match.team_b_name;
   const team2Name = battingFirstTeam === "A" ? match.team_b_name : match.team_a_name;
+  const jokerId = match.common_player_id ?? null;
 
   // Compute result
   let resultText = "Match drawn";
@@ -1043,10 +1211,10 @@ function FinalScorecard({ match, balls, byId }: { match: Match; balls: Ball[]; b
         <InningsCard label={`${team2Name} — Innings 2`} totals={i2} overs={match.total_overs} />
       </div>
 
-      <ScorecardBlock title={`${team1Name} batting`} ids={team1Ids} byId={byId} balls={balls.filter((b) => b.innings_number === 1)} mode="bat" />
-      <ScorecardBlock title={`${team2Name} bowling`} ids={team2Ids} byId={byId} balls={balls.filter((b) => b.innings_number === 1)} mode="bowl" />
-      <ScorecardBlock title={`${team2Name} batting`} ids={team2Ids} byId={byId} balls={balls.filter((b) => b.innings_number === 2)} mode="bat" />
-      <ScorecardBlock title={`${team1Name} bowling`} ids={team1Ids} byId={byId} balls={balls.filter((b) => b.innings_number === 2)} mode="bowl" />
+      <ScorecardBlock title={`${team1Name} batting`} ids={team1Ids} byId={byId} balls={balls.filter((b) => b.innings_number === 1)} mode="bat" jokerId={jokerId} />
+      <ScorecardBlock title={`${team2Name} bowling`} ids={team2Ids} byId={byId} balls={balls.filter((b) => b.innings_number === 1)} mode="bowl" jokerId={jokerId} />
+      <ScorecardBlock title={`${team2Name} batting`} ids={team2Ids} byId={byId} balls={balls.filter((b) => b.innings_number === 2)} mode="bat" jokerId={jokerId} />
+      <ScorecardBlock title={`${team1Name} bowling`} ids={team1Ids} byId={byId} balls={balls.filter((b) => b.innings_number === 2)} mode="bowl" jokerId={jokerId} />
 
       <PartnershipsBlock balls={balls.filter((b) => b.innings_number === 1)} innings={1} byId={byId} />
       <PartnershipsBlock balls={balls.filter((b) => b.innings_number === 2)} innings={2} byId={byId} />
