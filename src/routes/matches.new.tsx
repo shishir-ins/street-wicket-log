@@ -144,9 +144,10 @@ function NewMatch() {
 
   const battingList = battingFirst === "A" ? teamA : teamB;
   const bowlingList = battingFirst === "A" ? teamB : teamA;
-  // Include the Joker (common player) in both selectable lists without mutating state arrays.
-  const battingSelectable = commonId && !battingList.includes(commonId) ? [...battingList, commonId] : battingList;
-  const bowlingSelectable = commonId && !bowlingList.includes(commonId) ? [...bowlingList, commonId] : bowlingList;
+  if (commonId) {
+    if (!battingList.includes(commonId)) battingList.push(commonId);
+    if (!bowlingList.includes(commonId)) bowlingList.push(commonId);
+  }
 
   return (
     <AppShell>
@@ -260,8 +261,8 @@ function NewMatch() {
           </div>
 
           <div className="chalk-board p-5">
-            <h3 className="font-display tracking-widest mb-2">🃏 Joker (optional)</h3>
-            <p className="text-sm text-muted-foreground mb-3 font-chalk">For odd numbers — this Joker plays for both teams (bats & bowls for whoever needs them).</p>
+            <h3 className="font-display tracking-widest mb-2">Common player (optional)</h3>
+            <p className="text-sm text-muted-foreground mb-3 font-chalk">For odd numbers — this player bats for both teams.</p>
             <select className="bg-input/40 border border-border rounded-md px-3 py-2 w-full sm:w-80"
               value={commonId}
               onChange={(e) => {
@@ -269,7 +270,7 @@ function NewMatch() {
                 setCommonId(id);
                 if (id) { setTeamA(teamA.filter(x=>x!==id)); setTeamB(teamB.filter(x=>x!==id)); }
               }}>
-              <option value="">— no joker —</option>
+              <option value="">— none —</option>
               {players.filter((p) => !teamA.includes(p.id) && !teamB.includes(p.id) || p.id === commonId).map((p) => (
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
@@ -314,13 +315,13 @@ function NewMatch() {
             <h2 className="font-display tracking-widest mb-4">Openers & bowler</h2>
             <div className="grid sm:grid-cols-3 gap-3">
               <Field label="Striker">
-                <PlayerSelect value={strikerId} onChange={setStrikerId} ids={battingSelectable} byId={byId} exclude={[nonStrikerId]} />
+                <PlayerSelect value={strikerId} onChange={setStrikerId} ids={battingList} byId={byId} exclude={[nonStrikerId]} />
               </Field>
               <Field label="Non-striker">
-                <PlayerSelect value={nonStrikerId} onChange={setNonStrikerId} ids={battingSelectable} byId={byId} exclude={[strikerId]} />
+                <PlayerSelect value={nonStrikerId} onChange={setNonStrikerId} ids={battingList} byId={byId} exclude={[strikerId]} />
               </Field>
               <Field label="Opening bowler">
-                <PlayerSelect value={bowlerId} onChange={setBowlerId} ids={bowlingSelectable} byId={byId} exclude={[]} />
+                <PlayerSelect value={bowlerId} onChange={setBowlerId} ids={bowlingList} byId={byId} exclude={[]} />
               </Field>
             </div>
           </div>
