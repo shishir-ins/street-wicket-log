@@ -4,6 +4,44 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@keyframes joker-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 hsl(var(--accent) / 0.6), 0 0 12px 2px hsl(var(--primary) / 0.35); }
+  50% { box-shadow: 0 0 0 6px hsl(var(--accent) / 0), 0 0 22px 6px hsl(var(--primary) / 0.55); }
+}
+@keyframes joker-sparkle-spin {
+  from { transform: rotate(0deg); opacity: 0.9; }
+  to { transform: rotate(360deg); opacity: 0.9; }
+}
+@keyframes joker-text-shine {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+.joker-glow {
+  animation: joker-pulse 2s ease-in-out infinite;
+  border-color: hsl(var(--accent) / 0.7) !important;
+}
+.joker-sparkle {
+  position: absolute;
+  inset: -3px;
+  border-radius: 9999px;
+  pointer-events: none;
+  background:
+    conic-gradient(from 0deg, transparent 0deg, hsl(var(--accent)) 40deg, transparent 90deg, transparent 180deg, hsl(var(--primary)) 220deg, transparent 270deg, transparent 360deg);
+  mask: radial-gradient(circle, transparent 55%, black 60%);
+  -webkit-mask: radial-gradient(circle, transparent 55%, black 60%);
+  animation: joker-sparkle-spin 3.5s linear infinite;
+  opacity: 0.75;
+}
+.joker-text {
+  background: linear-gradient(90deg, hsl(var(--accent)), hsl(var(--primary)), hsl(var(--accent)));
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: joker-text-shine 3s ease-in-out infinite;
+  font-weight: 600;
+}
+
 /*
  * Design system definition.
  *
