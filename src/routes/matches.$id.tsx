@@ -99,8 +99,9 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
 
   const battingPlayers = (state.battingTeam === "A" ? match.team_a_players : match.team_b_players) as unknown as string[];
   const bowlingPlayers = (state.bowlingTeam === "A" ? match.team_a_players : match.team_b_players) as unknown as string[];
-  const battingTeamWithCommon = match.common_player_id ? [...battingPlayers, match.common_player_id] : battingPlayers;
-  const bowlingTeamWithCommon = match.common_player_id ? [...bowlingPlayers, match.common_player_id] : bowlingPlayers;
+  const uniq = (arr: string[]) => Array.from(new Set(arr.filter(Boolean)));
+  const battingTeamWithCommon = uniq(match.common_player_id ? [...battingPlayers, match.common_player_id] : battingPlayers);
+  const bowlingTeamWithCommon = uniq(match.common_player_id ? [...bowlingPlayers, match.common_player_id] : bowlingPlayers);
   const battingTeamName = state.battingTeam === "A" ? match.team_a_name : match.team_b_name;
   const bowlingTeamName = state.bowlingTeam === "A" ? match.team_a_name : match.team_b_name;
   const battingTeamSize = battingTeamWithCommon.length;
@@ -731,7 +732,9 @@ function BallPill({ label, wicket, dim }: { label: string; wicket?: boolean; dim
 function InningsTabs({ match, balls, byId, currentInnings }: { match: Match; balls: Ball[]; byId: Record<string, Player>; currentInnings?: number }) {
   const teamA_ids = (match.team_a_players as unknown as string[]) ?? [];
   const teamB_ids = (match.team_b_players as unknown as string[]) ?? [];
-  const withCommon = (ids: string[]) => match.common_player_id ? [...ids, match.common_player_id] : ids;
+  const withCommon = (ids: string[]) => Array.from(new Set(
+    (match.common_player_id ? [...ids, match.common_player_id] : ids).filter(Boolean)
+  ));
   const battingFirst = match.batting_first as Team;
   const t1Ids = withCommon(battingFirst === "A" ? teamA_ids : teamB_ids);
   const t2Ids = withCommon(battingFirst === "A" ? teamB_ids : teamA_ids);
@@ -983,7 +986,9 @@ function FinalScorecard({ match, balls, byId }: { match: Match; balls: Ball[]; b
 
   const teamA_ids = (match.team_a_players as unknown as string[]) ?? [];
   const teamB_ids = (match.team_b_players as unknown as string[]) ?? [];
-  const allWithCommon = (ids: string[]) => match.common_player_id ? [...ids, match.common_player_id] : ids;
+  const allWithCommon = (ids: string[]) => Array.from(new Set(
+    (match.common_player_id ? [...ids, match.common_player_id] : ids).filter(Boolean)
+  ));
 
   const battingFirstTeam = match.batting_first as Team;
   const team1Ids = allWithCommon(battingFirstTeam === "A" ? teamA_ids : teamB_ids);
