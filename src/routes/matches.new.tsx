@@ -260,9 +260,12 @@ function NewMatch() {
             })}
           </div>
 
-          <div className="chalk-board p-5">
-            <h3 className="font-display tracking-widest mb-2">Common player (optional)</h3>
-            <p className="text-sm text-muted-foreground mb-3 font-chalk">For odd numbers — this player bats for both teams.</p>
+          <div className="chalk-board p-5 relative overflow-hidden">
+            <h3 className="font-display tracking-widest mb-2 flex items-center gap-2">
+              <span className="inline-block px-2 py-0.5 rounded-md text-xs bg-gradient-to-r from-fuchsia-500 via-amber-400 to-emerald-400 text-black font-bold tracking-widest shadow-[0_0_20px_rgba(236,72,153,0.4)] animate-pulse">🃏 JOKER</span>
+              <span className="text-muted-foreground text-xs font-normal">(optional)</span>
+            </h3>
+            <p className="text-sm text-muted-foreground mb-3 font-chalk">For odd numbers — the JOKER bats and bowls for both teams.</p>
             <select className="bg-input/40 border border-border rounded-md px-3 py-2 w-full sm:w-80"
               value={commonId}
               onChange={(e) => {
