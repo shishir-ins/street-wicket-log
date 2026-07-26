@@ -1,76 +1,89 @@
 import { useEffect, useState, useCallback } from "react";
+import { Link } from "@tanstack/react-router";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
-const KEY = "bellamlabidi.admin";
-const PIN = (import.meta.env.VITE_ADMIN_PIN as string | undefined) ?? "1234";
-
+/**
+ * useAdmin — real Supabase-backed admin gate.
+ * A signed-in user is "admin" iff they have a row in public.user_roles with role='admin'.
+ * The first person who signs up is auto-assigned admin by a database trigger.
+ */
 export function useAdmin() {
-  const [isAdmin, setIsAdmin] = useState(false);
+  const qc = useQueryClient();
+  const [userId, setUserId] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
+
   useEffect(() => {
-    try {
-      setIsAdmin(localStorage.getItem(KEY) === "1");
-    } catch { /* ignore */ }
+    let mounted = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return;
+      setUserId(data.session?.user?.id ?? null);
+      setReady(true);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserId(session?.user?.id ?? null);
+      qc.invalidateQueries({ queryKey: ["admin-role"] });
+    });
+    return () => { mounted = false; sub.subscription.unsubscribe(); };
+  }, [qc]);
+
+  const roleQ = useQuery({
+    queryKey: ["admin-role", userId],
+    enabled: !!userId,
+    staleTime: 60_000,
+    queryFn: async () => {
+      if (!userId) return false;
+      const { data, error } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId)
+        .eq("role", "admin")
+        .maybeSingle();
+      if (error) return false;
+      return !!data;
+    },
+  });
+
+  const signOut = useCallback(async () => {
+    await supabase.auth.signOut();
   }, []);
-  const unlock = useCallback((pin: string) => {
-    if (pin === PIN) {
-      try { localStorage.setItem(KEY, "1"); } catch { /* ignore */ }
-      setIsAdmin(true);
-      return true;
-    }
-    return false;
-  }, []);
-  const lock = useCallback(() => {
-    try { localStorage.removeItem(KEY); } catch { /* ignore */ }
-    setIsAdmin(false);
-  }, []);
-  return { isAdmin, unlock, lock };
+
+  return {
+    isAdmin: ready && !!userId && roleQ.data === true,
+    isSignedIn: ready && !!userId,
+    isLoading: !ready || (!!userId && roleQ.isLoading),
+    signOut,
+  };
 }
 
 export function AdminLockButton() {
-  const { isAdmin, unlock, lock } = useAdmin();
-  const [open, setOpen] = useState(false);
-  const [pin, setPin] = useState("");
-  const [err, setErr] = useState("");
+  const { isAdmin, isSignedIn, signOut } = useAdmin();
   if (isAdmin) {
     return (
-      <button onClick={lock} className="text-[10px] font-display tracking-widest text-muted-foreground hover:text-destructive">
-        🔓 ADMIN — lock
+      <button
+        onClick={() => { void signOut(); }}
+        className="text-[10px] font-display tracking-widest text-primary hover:text-destructive"
+      >
+        🔓 ADMIN — sign out
+      </button>
+    );
+  }
+  if (isSignedIn) {
+    return (
+      <button
+        onClick={() => { void signOut(); }}
+        className="text-[10px] font-display tracking-widest text-muted-foreground hover:text-foreground"
+      >
+        👁 VIEWER — sign out
       </button>
     );
   }
   return (
-    <>
-      <button onClick={() => setOpen(true)} className="text-[10px] font-display tracking-widest text-muted-foreground hover:text-primary">
-        🔒 ADMIN
-      </button>
-      {open && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setOpen(false)}>
-          <div className="chalk-board p-5 w-full max-w-xs" onClick={(e) => e.stopPropagation()}>
-            <h3 className="font-display tracking-widest text-lg mb-2">Admin PIN</h3>
-            <input
-              type="password"
-              autoFocus
-              value={pin}
-              onChange={(e) => { setPin(e.target.value); setErr(""); }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  if (unlock(pin)) { setOpen(false); setPin(""); }
-                  else setErr("Wrong PIN");
-                }
-              }}
-              className="w-full bg-input/40 border border-border rounded-md px-3 py-2 mb-2"
-              placeholder="Enter PIN"
-            />
-            {err && <p className="text-destructive text-xs mb-2">{err}</p>}
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setOpen(false)} className="btn-chalk rounded-md px-3 py-1.5 text-sm">Cancel</button>
-              <button
-                onClick={() => { if (unlock(pin)) { setOpen(false); setPin(""); } else setErr("Wrong PIN"); }}
-                className="rounded-md bg-primary text-primary-foreground px-3 py-1.5 text-sm font-display tracking-wide"
-              >Unlock</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
+    <Link
+      to="/auth"
+      className="text-[10px] font-display tracking-widest text-muted-foreground hover:text-primary"
+    >
+      🔒 SIGN IN
+    </Link>
   );
 }
