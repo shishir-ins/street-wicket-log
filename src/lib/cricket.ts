@@ -297,3 +297,32 @@ export function computePartnerships(balls: Ball[], innings: number): Partnership
   }
   return out;
 }
+
+// ---------- Hat-tricks ----------
+// A hat-trick = 3 wickets in 3 consecutive legal balls by the same bowler
+// (bowled/caught/lbw/stumped/hit-wicket — run-outs excluded, same as bowling wickets).
+export function computeHatTricks(balls: Ball[]): Record<string, { count: number; balls: number[] }> {
+  const map: Record<string, { count: number; balls: number[] }> = {};
+  const ensure = (id: string) => (map[id] ??= { count: 0, balls: [] });
+  // group by bowler + innings, in order
+  const byBowler: Record<string, Ball[]> = {};
+  const ordered = [...balls].sort((a, b) => a.ball_index - b.ball_index);
+  for (const b of ordered) {
+    if (!b.bowler_id || !b.is_legal_ball) continue;
+    const k = `${b.bowler_id}|${b.innings_number}`;
+    (byBowler[k] ??= []).push(b);
+  }
+  const isBowlerWicket = (b: Ball) => b.is_wicket && b.wicket_type && b.wicket_type !== "Run Out";
+  for (const k of Object.keys(byBowler)) {
+    const arr = byBowler[k];
+    for (let i = 0; i <= arr.length - 3; i++) {
+      if (isBowlerWicket(arr[i]) && isBowlerWicket(arr[i + 1]) && isBowlerWicket(arr[i + 2])) {
+        const bl = ensure(arr[i].bowler_id as string);
+        bl.count += 1;
+        bl.balls.push(arr[i + 2].ball_index);
+        i += 2;
+      }
+    }
+  }
+  return map;
+}

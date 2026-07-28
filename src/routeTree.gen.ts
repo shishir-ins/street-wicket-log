@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as MatchesRouteImport } from './routes/matches'
+import { Route as AwardsRouteImport } from './routes/awards'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PlayersIndexRouteImport } from './routes/players.index'
@@ -26,6 +27,11 @@ const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
 const MatchesRoute = MatchesRouteImport.update({
   id: '/matches',
   path: '/matches',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AwardsRoute = AwardsRouteImport.update({
+  id: '/awards',
+  path: '/awards',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -62,6 +68,7 @@ const MatchesIdRoute = MatchesIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/awards': typeof AwardsRoute
   '/matches': typeof MatchesRouteWithChildren
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/matches/$id': typeof MatchesIdRoute
@@ -72,6 +79,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/awards': typeof AwardsRoute
   '/matches': typeof MatchesRouteWithChildren
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/matches/$id': typeof MatchesIdRoute
@@ -83,6 +91,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/awards': typeof AwardsRoute
   '/matches': typeof MatchesRouteWithChildren
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/matches/$id': typeof MatchesIdRoute
@@ -95,6 +104,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/awards'
     | '/matches'
     | '/sitemap.xml'
     | '/matches/$id'
@@ -105,6 +115,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
+    | '/awards'
     | '/matches'
     | '/sitemap.xml'
     | '/matches/$id'
@@ -115,6 +126,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/auth'
+    | '/awards'
     | '/matches'
     | '/sitemap.xml'
     | '/matches/$id'
@@ -126,6 +138,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
+  AwardsRoute: typeof AwardsRoute
   MatchesRoute: typeof MatchesRouteWithChildren
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   PlayersIdRoute: typeof PlayersIdRoute
@@ -146,6 +159,13 @@ declare module '@tanstack/react-router' {
       path: '/matches'
       fullPath: '/matches'
       preLoaderRoute: typeof MatchesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/awards': {
+      id: '/awards'
+      path: '/awards'
+      fullPath: '/awards'
+      preLoaderRoute: typeof AwardsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -209,6 +229,7 @@ const MatchesRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
+  AwardsRoute: AwardsRoute,
   MatchesRoute: MatchesRouteWithChildren,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   PlayersIdRoute: PlayersIdRoute,

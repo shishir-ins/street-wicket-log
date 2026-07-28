@@ -6,13 +6,15 @@ import { AppShell } from "@/components/AppShell";
 import {
   computeBatting, computeBowling, computeFielding,
   computeInningsTotals, buildOverTimeline, oversString, runRate, requiredRunRate, playerMatchScore,
-  commentaryFor, computePartnerships,
+  commentaryFor, computePartnerships, computeHatTricks,
   type Ball, type Player, type Match, type MatchState, type Team,
 } from "@/lib/cricket";
 import {
   ArrowLeft, Undo2, Redo2, Pause, Play, Award, Activity, Share2, FileDown, MessageSquare, Users, Repeat,
 } from "lucide-react";
 import { useAdmin, AdminLockButton } from "@/lib/admin";
+import { PlayerChip } from "@/components/PlayerChip";
+import { PLAYER_ROLES, type PlayerRole } from "@/lib/cricket";
 
 export const Route = createFileRoute("/matches/$id")({
   head: () => ({
@@ -710,9 +712,9 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
 
 function BatsmanCard({ label, player, line }: { label: string; player?: Player; line?: { runs: number; ballsFaced: number; fours: number; sixes: number; strikeRate: number } }) {
   return (
-    <div className="chalk-board p-4">
+    <div className="glass-card p-4 rounded-2xl">
       <div className="text-xs font-display tracking-wider text-muted-foreground">{label.toUpperCase()}</div>
-      <div className="font-display text-2xl tracking-wide mt-0.5">{player?.name ?? "—"}</div>
+      <div className="mt-1"><PlayerChip player={player} size="md" /></div>
       <div className="text-sm text-muted-foreground mt-1 font-chalk">
         {line ? `${line.runs} (${line.ballsFaced})  ·  SR ${line.strikeRate.toFixed(1)}  ·  ${line.fours}×4 ${line.sixes}×6` : "0 (0)"}
       </div>
@@ -774,8 +776,9 @@ function InningsTabs({ match, balls, byId, currentInnings }: { match: Match; bal
 function ScorecardBlock({ title, ids, byId, balls, mode }: { title: string; ids: string[]; byId: Record<string, Player>; balls: Ball[]; mode: "bat" | "bowl" }) {
   const bat = computeBatting(balls);
   const bow = computeBowling(balls);
+  const hats = computeHatTricks(balls);
   return (
-    <div className="chalk-board p-4 mt-4">
+    <div className="glass-card p-4 mt-4 rounded-2xl sticker-bat">
       <h3 className="font-display tracking-widest mb-3">{title}</h3>
       {mode === "bat" ? (
         <div className="overflow-x-auto">
@@ -789,7 +792,7 @@ function ScorecardBlock({ title, ids, byId, balls, mode }: { title: string; ids:
                 if (!l) return null;
                 return (
                   <tr key={id} className="border-t border-border/30">
-                    <td className="py-1.5">{byId[id]?.name ?? "?"}</td>
+                    <td className="py-1.5"><PlayerChip player={byId[id]} size="xs" /></td>
                     <td className="text-center font-medium">{l.runs}</td>
                     <td className="text-center text-muted-foreground">{l.ballsFaced}</td>
                     <td className="text-center text-muted-foreground">{l.fours}</td>
@@ -806,20 +809,22 @@ function ScorecardBlock({ title, ids, byId, balls, mode }: { title: string; ids:
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="text-xs text-muted-foreground font-display tracking-wider">
-              <tr><th className="text-left py-1">Bowler</th><th>O</th><th>M</th><th>R</th><th>W</th><th>Eco</th></tr>
+              <tr><th className="text-left py-1">Bowler</th><th>O</th><th>M</th><th>R</th><th>W</th><th>Eco</th><th title="Hat-tricks">H</th></tr>
             </thead>
             <tbody>
               {ids.map((id) => {
                 const l = bow[id];
                 if (!l) return null;
+                const ht = hats[id]?.count ?? 0;
                 return (
                   <tr key={id} className="border-t border-border/30">
-                    <td className="py-1.5">{byId[id]?.name ?? "?"}</td>
+                    <td className="py-1.5"><PlayerChip player={byId[id]} size="xs" /></td>
                     <td className="text-center">{Math.floor(l.legalBalls/6)}.{l.legalBalls%6}</td>
                     <td className="text-center">{l.maidens}</td>
                     <td className="text-center">{l.runsConceded}</td>
                     <td className="text-center font-medium">{l.wickets}</td>
                     <td className="text-center text-muted-foreground">{l.economy.toFixed(2)}</td>
+                    <td className="text-center">{ht > 0 ? <span title="Hat-trick!" className="joker-shine px-1.5 py-0.5 rounded text-[10px] font-display tracking-wider">×{ht}</span> : <span className="text-muted-foreground">·</span>}</td>
                   </tr>
                 );
               })}
