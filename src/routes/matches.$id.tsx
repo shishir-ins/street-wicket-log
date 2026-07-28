@@ -712,9 +712,9 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
 
 function BatsmanCard({ label, player, line }: { label: string; player?: Player; line?: { runs: number; ballsFaced: number; fours: number; sixes: number; strikeRate: number } }) {
   return (
-    <div className="chalk-board p-4">
+    <div className="glass-card p-4 rounded-2xl">
       <div className="text-xs font-display tracking-wider text-muted-foreground">{label.toUpperCase()}</div>
-      <div className="font-display text-2xl tracking-wide mt-0.5">{player?.name ?? "—"}</div>
+      <div className="mt-1"><PlayerChip player={player} size="md" /></div>
       <div className="text-sm text-muted-foreground mt-1 font-chalk">
         {line ? `${line.runs} (${line.ballsFaced})  ·  SR ${line.strikeRate.toFixed(1)}  ·  ${line.fours}×4 ${line.sixes}×6` : "0 (0)"}
       </div>
