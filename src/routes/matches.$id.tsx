@@ -6,13 +6,15 @@ import { AppShell } from "@/components/AppShell";
 import {
   computeBatting, computeBowling, computeFielding,
   computeInningsTotals, buildOverTimeline, oversString, runRate, requiredRunRate, playerMatchScore,
-  commentaryFor, computePartnerships,
+  commentaryFor, computePartnerships, computeHatTricks,
   type Ball, type Player, type Match, type MatchState, type Team,
 } from "@/lib/cricket";
 import {
   ArrowLeft, Undo2, Redo2, Pause, Play, Award, Activity, Share2, FileDown, MessageSquare, Users, Repeat,
 } from "lucide-react";
 import { useAdmin, AdminLockButton } from "@/lib/admin";
+import { PlayerChip } from "@/components/PlayerChip";
+import { PLAYER_ROLES, type PlayerRole } from "@/lib/cricket";
 
 export const Route = createFileRoute("/matches/$id")({
   head: () => ({
