@@ -3,9 +3,9 @@ import type { ReactNode } from "react";
 import { Home, Users, ListChecks, PlayCircle } from "lucide-react";
 
 const navItems = [
-  { to: "/" as const, label: "Pitch", icon: Home },
-  { to: "/players" as const, label: "Squad", icon: Users },
-  { to: "/matches" as const, label: "Matches", icon: ListChecks },
+  { to: "/" as const, label: "Pitch", icon: Home, color: "#22c55e" },        // green
+  { to: "/players" as const, label: "Squad", icon: Users, color: "#38bdf8" }, // sky blue
+  { to: "/matches" as const, label: "Matches", icon: ListChecks, color: "#facc15" }, // yellow
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -27,8 +27,9 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Link
                 key={it.to}
                 to={it.to}
-                className="px-3 py-2 rounded-md text-sm font-display tracking-wide text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-                activeProps={{ className: "px-3 py-2 rounded-md text-sm font-display tracking-wide text-primary bg-primary/10" }}
+                style={{ ["--tab-color" as string]: it.color }}
+                className="px-3 py-2 rounded-md text-sm font-display tracking-wide text-muted-foreground hover:text-[var(--tab-color)] hover:bg-[color-mix(in_oklab,var(--tab-color)_15%,transparent)] transition-colors"
+                activeProps={{ className: "px-3 py-2 rounded-md text-sm font-display tracking-wide text-[var(--tab-color)] bg-[color-mix(in_oklab,var(--tab-color)_18%,transparent)] border border-[color-mix(in_oklab,var(--tab-color)_40%,transparent)]" }}
                 activeOptions={{ exact: it.to === "/" }}
               >
                 {it.label}
@@ -57,8 +58,9 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Link
                 key={it.to}
                 to={it.to}
+                style={{ ["--tab-color" as string]: it.color }}
                 className="flex flex-col items-center justify-center py-2.5 text-xs text-muted-foreground"
-                activeProps={{ className: "flex flex-col items-center justify-center py-2.5 text-xs text-primary" }}
+                activeProps={{ className: "flex flex-col items-center justify-center py-2.5 text-xs text-[var(--tab-color)]" }}
                 activeOptions={{ exact: it.to === "/" }}
               >
                 <Icon className="h-5 w-5 mb-0.5" />
