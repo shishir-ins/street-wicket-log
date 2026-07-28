@@ -1,11 +1,12 @@
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
-import { Home, Users, ListChecks, PlayCircle } from "lucide-react";
+import { Home, Users, ListChecks, PlayCircle, Trophy } from "lucide-react";
 
 const navItems = [
   { to: "/" as const, label: "Pitch", icon: Home, color: "#22c55e" },        // green
   { to: "/players" as const, label: "Squad", icon: Users, color: "#38bdf8" }, // sky blue
   { to: "/matches" as const, label: "Matches", icon: ListChecks, color: "#facc15" }, // yellow
+  { to: "/awards" as const, label: "Awards", icon: Trophy, color: "#f472b6" },       // pink
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -51,7 +52,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </main>
 
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-background/90 backdrop-blur border-t border-border">
-        <div className="grid grid-cols-3 max-w-md mx-auto">
+        <div className="grid grid-cols-4 max-w-md mx-auto">
           {navItems.map((it) => {
             const Icon = it.icon;
             return (
