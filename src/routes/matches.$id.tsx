@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
 import {
@@ -15,6 +15,7 @@ import {
 import { useAdmin, AdminLockButton } from "@/lib/admin";
 import { PlayerChip } from "@/components/PlayerChip";
 import { PLAYER_ROLES, type PlayerRole } from "@/lib/cricket";
+import { Celebration, type CelebrationKind } from "@/components/Celebration";
 
 export const Route = createFileRoute("/matches/$id")({
   head: () => ({
@@ -130,6 +131,42 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
   const [replaceBatsman, setReplaceBatsman] = useState<null | "striker" | "nonStriker">(null);
   // Local redo stack of undone balls (not persisted across reloads)
   const [redoStack, setRedoStack] = useState<Array<{ ball: Ball; stateAfter: MatchState; status: string }>>([]);
+
+  // Celebration overlay for milestones (50/100/hat-trick/six)
+  const [celebration, setCelebration] = useState<{ kind: CelebrationKind; name?: string }>({ kind: null });
+  const milestoneRef = useRef<{ batting: Record<string, number>; hats: Record<string, number>; initialized: boolean }>({
+    batting: {}, hats: {}, initialized: false,
+  });
+  useEffect(() => {
+    const hats = computeHatTricks(balls);
+    // On first render just baseline (don't celebrate historical events on load)
+    if (!milestoneRef.current.initialized) {
+      const bl: Record<string, number> = {};
+      for (const k of Object.keys(batting)) bl[k] = batting[k].runs;
+      const ht: Record<string, number> = {};
+      for (const k of Object.keys(hats)) ht[k] = hats[k].count;
+      milestoneRef.current = { batting: bl, hats: ht, initialized: true };
+      return;
+    }
+    let fired: { kind: CelebrationKind; name?: string } | null = null;
+    // Batting milestones — check striker & non-striker changes
+    for (const pid of Object.keys(batting)) {
+      const prev = milestoneRef.current.batting[pid] ?? 0;
+      const curr = batting[pid].runs;
+      if (prev < 100 && curr >= 100) { fired = { kind: "hundred", name: byId[pid]?.name }; break; }
+      if (prev < 50 && curr >= 50) fired = { kind: "fifty", name: byId[pid]?.name };
+      milestoneRef.current.batting[pid] = curr;
+    }
+    // Hat-trick — any bowler's count increased
+    for (const pid of Object.keys(hats)) {
+      const prev = milestoneRef.current.hats[pid] ?? 0;
+      const curr = hats[pid].count;
+      if (curr > prev) fired = { kind: "hattrick", name: byId[pid]?.name };
+      milestoneRef.current.hats[pid] = curr;
+    }
+    if (fired) setCelebration(fired);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [balls]);
 
   // Detect target from completed innings 1
   useEffect(() => {
@@ -706,6 +743,7 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
       <p className="text-xs text-muted-foreground mt-6">
         Team size: {battingTeamSizeForUI}. {isAdmin ? "Saves automatically with every ball." : "Read-only view."}
       </p>
+      <Celebration kind={celebration.kind} name={celebration.name} onDone={() => setCelebration({ kind: null })} />
     </AppShell>
   );
 }

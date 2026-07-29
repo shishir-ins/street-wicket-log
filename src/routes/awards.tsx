@@ -5,10 +5,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
 import { PlayerChip } from "@/components/PlayerChip";
 import {
-  computeBatting, computeBowling, computeFielding, computeHatTricks,
+  computeBatting, computeBowling, computeFielding, computeHatTricks, computeMilestones,
   type Ball, type Player, type Match,
 } from "@/lib/cricket";
-import { Trophy, Target, Flame, Hand, Zap, Sparkles } from "lucide-react";
+import { Trophy, Target, Flame, Hand, Zap, Sparkles, Award, Crown } from "lucide-react";
 
 export const Route = createFileRoute("/awards")({
   head: () => ({
@@ -65,6 +65,7 @@ function AwardsPage() {
   const bowling = computeBowling(scoped);
   const fielding = computeFielding(scoped);
   const hatTricks = computeHatTricks(scoped);
+  const milestones = computeMilestones(scoped);
 
   const topRuns = Object.values(batting).sort((a, b) => b.runs - a.runs).slice(0, 5);
   const topWickets = Object.values(bowling).sort((a, b) => b.wickets - a.wickets).slice(0, 5);
@@ -74,6 +75,9 @@ function AwardsPage() {
   const topFours = Object.values(batting).sort((a, b) => b.fours - a.fours).slice(0, 5);
   const topCatches = Object.entries(fielding).sort(([, a], [, b]) => b.catches - a.catches).slice(0, 5);
   const hatTrickRows = Object.entries(hatTricks).sort(([, a], [, b]) => b.count - a.count).slice(0, 5);
+  const centuryRows = Object.entries(milestones).filter(([, m]) => m.hundreds > 0).sort(([, a], [, b]) => b.hundreds - a.hundreds).slice(0, 5);
+  const fiftyRows = Object.entries(milestones).filter(([, m]) => m.fifties > 0 || m.hundreds > 0).sort(([, a], [, b]) => (b.fifties + b.hundreds) - (a.fifties + a.hundreds)).slice(0, 5);
+  const highestRows = Object.entries(milestones).filter(([, m]) => m.highest > 0).sort(([, a], [, b]) => b.highest - a.highest).slice(0, 5);
 
   return (
     <AppShell>
@@ -95,6 +99,9 @@ function AwardsPage() {
         <Leaderboard title="Top Run Scorers" icon={Trophy} rows={topRuns.map((r) => ({ id: r.playerId, main: r.runs, sub: `${r.fours}×4  ${r.sixes}×6` }))} mainLabel="Runs" byId={byId} />
         <Leaderboard title="Top Wicket Takers" icon={Target} rows={topWickets.map((r) => ({ id: r.playerId, main: r.wickets, sub: `Eco ${r.economy.toFixed(2)}` }))} mainLabel="Wkts" byId={byId} />
         <Leaderboard title="Hat-Tricks" icon={Sparkles} rows={hatTrickRows.map(([id, h]) => ({ id, main: h.count, sub: `${h.count} hat-trick${h.count>1?"s":""}` }))} mainLabel="H-T" byId={byId} />
+        <Leaderboard title="Centuries" icon={Crown} rows={centuryRows.map(([id, m]) => ({ id, main: m.hundreds, sub: `HS ${m.highest}` }))} mainLabel="100s" byId={byId} />
+        <Leaderboard title="Half-Centuries+" icon={Award} rows={fiftyRows.map(([id, m]) => ({ id, main: m.fifties + m.hundreds, sub: `${m.fifties}×50 · ${m.hundreds}×100` }))} mainLabel="50+" byId={byId} />
+        <Leaderboard title="Highest Scores" icon={Trophy} rows={highestRows.map(([id, m]) => ({ id, main: m.highest, sub: `${m.hundreds}×100 ${m.fifties}×50` }))} mainLabel="HS" byId={byId} />
         <Leaderboard title="Best Strike Rates" icon={Zap} rows={topSR.map((r) => ({ id: r.playerId, main: r.strikeRate.toFixed(1), sub: `${r.runs}(${r.ballsFaced})` }))} mainLabel="SR" byId={byId} />
         <Leaderboard title="Best Economy" icon={Target} rows={topEco.map((r) => ({ id: r.playerId, main: r.economy.toFixed(2), sub: `${r.wickets}w` }))} mainLabel="Eco" byId={byId} />
         <Leaderboard title="Most Sixes" icon={Flame} rows={topSixes.map((r) => ({ id: r.playerId, main: r.sixes, sub: `${r.runs} runs` }))} mainLabel="6s" byId={byId} />
