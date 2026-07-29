@@ -259,3 +259,29 @@
       radial-gradient(40% 30% at 60% 20%, oklch(0.6 0.15 220 / 0.14), transparent 70%);
   }
 }
+
+/* -------------------- Celebrations -------------------- */
+@keyframes confetti-fall {
+  0% { transform: translate3d(0, 0, 0) rotate(0deg); opacity: 1; }
+  100% { transform: translate3d(var(--sway, 0px), 110vh, 0) rotate(var(--rot-end, 360deg)); opacity: 0.9; }
+}
+@keyframes pop-in {
+  0% { transform: scale(0.4); opacity: 0; }
+  60% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* -------------------- Per-page tab-color washes --------------------
+   AppShell sets --page-color via inline style. These utilities apply
+   the color-mix accent to the whole page background & hero borders. */
+.page-theme {
+  background:
+    radial-gradient(60% 40% at 20% 0%, color-mix(in oklab, var(--page-color, transparent) 20%, transparent), transparent 70%),
+    radial-gradient(50% 40% at 100% 15%, color-mix(in oklab, var(--page-color, transparent) 14%, transparent), transparent 70%);
+  min-height: 100vh;
+}
+.page-theme .glass-card,
+.page-theme .chalk-board {
+  border-color: color-mix(in oklab, var(--page-color, oklch(0.94 0.03 85 / 0.14)) 30%, oklch(0.94 0.03 85 / 0.14));
+  box-shadow: 0 12px 40px -18px color-mix(in oklab, var(--page-color, black) 40%, transparent);
+}

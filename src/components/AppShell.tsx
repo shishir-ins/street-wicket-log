@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+import { useRouterState } from "@tanstack/react-router";
 import { Home, Users, ListChecks, PlayCircle, Trophy } from "lucide-react";
 
 const navItems = [
@@ -9,9 +10,18 @@ const navItems = [
   { to: "/awards" as const, label: "Awards", icon: Trophy, color: "#f472b6" },       // pink
 ];
 
-export function AppShell({ children }: { children: ReactNode }) {
+const pageColorFor = (path: string): string => {
+  if (path.startsWith("/players")) return "#38bdf8"; // sky
+  if (path.startsWith("/matches")) return "#facc15"; // yellow
+  if (path.startsWith("/awards")) return "#f472b6"; // pink
+  return "#22c55e"; // home / green
+};
+
+export function AppShell({ children, themeColor }: { children: ReactNode; themeColor?: string }) {
+  const path = useRouterState({ select: (s) => s.location.pathname });
+  const pageColor = themeColor ?? pageColorFor(path);
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col page-theme" style={{ ["--page-color" as string]: pageColor }}>
       <header className="sticky top-0 z-30 backdrop-blur-md bg-background/80 border-b border-border">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
           <Link to="/" className="flex items-center gap-2 group">
