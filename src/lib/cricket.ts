@@ -326,3 +326,31 @@ export function computeHatTricks(balls: Ball[]): Record<string, { count: number;
   }
   return map;
 }
+
+// ---------- Milestones (per innings, per match) ----------
+// Counts fifties (>=50 & <100) and hundreds (>=100) per player across all provided balls.
+export function computeMilestones(balls: Ball[]): Record<string, { fifties: number; hundreds: number; highest: number }> {
+  // per innings-of-a-match striker runs
+  const perInnings: Record<string, Record<string, number>> = {};
+  for (const b of balls) {
+    if (!b.striker_id) continue;
+    let r = 0;
+    if (b.extra_type === "wide" || b.extra_type === "bye" || b.extra_type === "leg_bye" || b.extra_type === "declared") r = 0;
+    else r = b.runs ?? 0; // no-ball still awards bat runs
+    const key = `${b.match_id}|${b.innings_number}`;
+    perInnings[key] ??= {};
+    perInnings[key][b.striker_id] = (perInnings[key][b.striker_id] ?? 0) + r;
+  }
+  const out: Record<string, { fifties: number; hundreds: number; highest: number }> = {};
+  const ensure = (id: string) => (out[id] ??= { fifties: 0, hundreds: 0, highest: 0 });
+  for (const key of Object.keys(perInnings)) {
+    for (const pid of Object.keys(perInnings[key])) {
+      const runs = perInnings[key][pid];
+      const rec = ensure(pid);
+      if (runs >= 100) rec.hundreds += 1;
+      else if (runs >= 50) rec.fifties += 1;
+      if (runs > rec.highest) rec.highest = runs;
+    }
+  }
+  return out;
+}
