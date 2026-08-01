@@ -4,7 +4,7 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/AppShell";
 import { PLAYER_ROLES, type Player, type PlayerRole } from "@/lib/cricket";
-import { Search, UserPlus, Trash2 } from "lucide-react";
+import { Search, UserPlus, Trash2, Pencil, Check, X } from "lucide-react";
 import { useAdmin, AdminLockButton } from "@/lib/admin";
 
 export const Route = createFileRoute("/players/")({
@@ -52,6 +52,21 @@ function PlayersPage() {
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["players"] }),
+  });
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const renamePlayer = useMutation({
+    mutationFn: async (v: { id: string; name: string }) => {
+      const trimmed = v.name.trim();
+      if (!trimmed) throw new Error("Name required");
+      const { error } = await supabase.from("players").update({ name: trimmed }).eq("id", v.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setEditingId(null);
+      qc.invalidateQueries({ queryKey: ["players"] });
+    },
   });
 
   const list = (playersQ.data ?? []).filter((p) => p.name.toLowerCase().includes(q.toLowerCase()));
@@ -123,6 +138,22 @@ function PlayersPage() {
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {list.map((p) => (
           <div key={p.id} className="chalk-board p-4 flex items-center gap-3 group">
+            {editingId === p.id ? (
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <input
+                  autoFocus
+                  className="flex-1 min-w-0 bg-input/40 border border-border rounded-md px-2 py-1.5 text-sm"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") renamePlayer.mutate({ id: p.id, name: editName }); }}
+                />
+                <button onClick={() => renamePlayer.mutate({ id: p.id, name: editName })}
+                  className="p-2 text-primary" aria-label="Save name"><Check className="h-4 w-4" /></button>
+                <button onClick={() => setEditingId(null)}
+                  className="p-2 text-muted-foreground" aria-label="Cancel"><X className="h-4 w-4" /></button>
+              </div>
+            ) : (
+            <>
             <Link to="/players/$id" params={{ id: p.id }} className="flex items-center gap-3 flex-1 min-w-0">
               {p.photo_url ? (
                 <img src={p.photo_url} alt={p.name} className="h-12 w-12 rounded-full object-cover border border-primary/30 shrink-0" />
@@ -138,12 +169,23 @@ function PlayersPage() {
             </Link>
             {isAdmin && (
               <button
+                onClick={() => { setEditingId(p.id); setEditName(p.name); }}
+                className="p-2 text-muted-foreground hover:text-primary opacity-0 group-hover:opacity-100 transition"
+                aria-label="Edit name"
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+            )}
+            {isAdmin && (
+              <button
                 onClick={() => { if (confirm(`Remove ${p.name}?`)) removePlayer.mutate(p.id); }}
                 className="p-2 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition"
                 aria-label="Remove"
               >
                 <Trash2 className="h-4 w-4" />
               </button>
+            )}
+            </>
             )}
           </div>
         ))}
