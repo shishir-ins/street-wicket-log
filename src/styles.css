@@ -316,3 +316,60 @@
   border-color: color-mix(in oklab, var(--page-color, oklch(0.94 0.03 85 / 0.14)) 30%, oklch(0.94 0.03 85 / 0.14));
   box-shadow: 0 12px 40px -18px color-mix(in oklab, var(--page-color, black) 40%, transparent);
 }
+
+/* -------------------- Animated nav pill (mica glass) -------------------- */
+.nav-pill {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  height: calc(100% - 8px);
+  margin-top: calc((100% - 8px) / -2);
+  border-radius: 9999px;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    linear-gradient(135deg,
+      color-mix(in oklab, var(--pill-color, #22c55e) 42%, transparent),
+      color-mix(in oklab, var(--pill-color, #22c55e) 20%, transparent));
+  border: 1px solid color-mix(in oklab, var(--pill-color, #22c55e) 60%, transparent);
+  backdrop-filter: blur(14px) saturate(150%);
+  box-shadow: 0 6px 22px -10px color-mix(in oklab, var(--pill-color, #22c55e) 80%, transparent);
+  transition:
+    transform 0.45s cubic-bezier(0.22, 1.2, 0.36, 1),
+    width 0.45s cubic-bezier(0.22, 1.2, 0.36, 1),
+    background 0.45s ease,
+    border-color 0.45s ease,
+    box-shadow 0.45s ease,
+    opacity 0.25s ease;
+}
+.nav-pill-mobile {
+  height: calc(100% - 10px);
+  margin-top: calc((100% - 10px) / -2);
+}
+
+/* -------------------- Page / element enter transitions -------------------- */
+@keyframes page-enter-anim {
+  0% { opacity: 0; transform: translateY(10px) scale(0.995); filter: blur(4px); }
+  100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+@keyframes child-rise {
+  0% { opacity: 0; transform: translateY(14px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.page-enter {
+  animation: page-enter-anim 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.page-enter > * {
+  animation: child-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.page-enter > *:nth-child(1) { animation-delay: 0.04s; }
+.page-enter > *:nth-child(2) { animation-delay: 0.09s; }
+.page-enter > *:nth-child(3) { animation-delay: 0.14s; }
+.page-enter > *:nth-child(4) { animation-delay: 0.19s; }
+.page-enter > *:nth-child(5) { animation-delay: 0.24s; }
+.page-enter > *:nth-child(n + 6) { animation-delay: 0.28s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-pill { transition: opacity 0.2s ease; }
+  .page-enter, .page-enter > * { animation: none; }
+}

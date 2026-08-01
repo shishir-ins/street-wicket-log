@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { useRouterState } from "@tanstack/react-router";
 import { Home, Users, ListChecks, PlayCircle, Trophy } from "lucide-react";
 
@@ -17,9 +17,65 @@ const pageColorFor = (path: string): string => {
   return "#22c55e"; // home / green
 };
 
+const activeIndexFor = (path: string): number => {
+  if (path.startsWith("/players")) return 1;
+  if (path.startsWith("/matches")) return 2;
+  if (path.startsWith("/awards")) return 3;
+  return 0;
+};
+
+type PillBox = { left: number; width: number; ready: boolean };
+
+/** Measures the active nav item and animates a single pill between items. */
+function usePill(activeIndex: number) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const itemRefs = useRef<Array<HTMLAnchorElement | null>>([]);
+  const [box, setBox] = useState<PillBox>({ left: 0, width: 0, ready: false });
+  const [stretching, setStretching] = useState(false);
+  const prevIndex = useRef(activeIndex);
+
+  const measure = useCallback(() => {
+    const el = itemRefs.current[activeIndex];
+    const parent = containerRef.current;
+    if (!el || !parent) return;
+    const p = parent.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    setBox({ left: r.left - p.left, width: r.width, ready: true });
+  }, [activeIndex]);
+
+  useLayoutEffect(() => {
+    measure();
+  }, [measure]);
+
+  useEffect(() => {
+    const onResize = () => measure();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [measure]);
+
+  // Elongate while travelling between tabs.
+  useEffect(() => {
+    if (prevIndex.current === activeIndex) return;
+    prevIndex.current = activeIndex;
+    setStretching(true);
+    const t = setTimeout(() => setStretching(false), 260);
+    return () => clearTimeout(t);
+  }, [activeIndex]);
+
+  const setItemRef = (i: number) => (el: HTMLAnchorElement | null) => {
+    itemRefs.current[i] = el;
+  };
+
+  return { containerRef, setItemRef, box, stretching };
+}
+
 export function AppShell({ children, themeColor }: { children: ReactNode; themeColor?: string }) {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const pageColor = themeColor ?? pageColorFor(path);
+  const activeIndex = activeIndexFor(path);
+  const desktop = usePill(activeIndex);
+  const mobile = usePill(activeIndex);
+
   return (
     <div className="min-h-screen flex flex-col page-theme" style={{ ["--page-color" as string]: pageColor }}>
       <header className="sticky top-0 z-30 backdrop-blur-md bg-background/80 border-b border-border">
@@ -33,14 +89,25 @@ export function AppShell({ children, themeColor }: { children: ReactNode; themeC
               <span className="font-chalk text-xs text-muted-foreground -mt-0.5">gully cricket scoreboard</span>
             </div>
           </Link>
-          <nav className="hidden md:flex items-center gap-1">
-            {navItems.map((it) => (
+          <nav ref={desktop.containerRef} className="hidden md:flex items-center gap-1 relative">
+            <span
+              aria-hidden
+              className="nav-pill"
+              style={{
+                opacity: desktop.box.ready ? 1 : 0,
+                transform: `translateX(${desktop.box.left}px) scaleX(${desktop.stretching ? 1.18 : 1})`,
+                width: desktop.box.width,
+                ["--pill-color" as string]: pageColor,
+              }}
+            />
+            {navItems.map((it, i) => (
               <Link
                 key={it.to}
                 to={it.to}
+                ref={desktop.setItemRef(i)}
                 style={{ ["--tab-color" as string]: it.color }}
-                className="px-3 py-2 rounded-md text-sm font-display tracking-wide text-muted-foreground hover:text-[var(--tab-color)] hover:bg-[color-mix(in_oklab,var(--tab-color)_15%,transparent)] transition-colors"
-                activeProps={{ className: "px-3 py-2 rounded-md text-sm font-display tracking-wide text-[var(--tab-color)] bg-[color-mix(in_oklab,var(--tab-color)_18%,transparent)] border border-[color-mix(in_oklab,var(--tab-color)_40%,transparent)]" }}
+                className="relative z-10 px-4 py-2 rounded-full text-sm font-display tracking-wide text-muted-foreground hover:text-[var(--tab-color)] transition-colors duration-300"
+                activeProps={{ className: "relative z-10 px-4 py-2 rounded-full text-sm font-display tracking-wide text-[var(--tab-color)] transition-colors duration-300" }}
                 activeOptions={{ exact: it.to === "/" }}
               >
                 {it.label}
@@ -57,24 +124,35 @@ export function AppShell({ children, themeColor }: { children: ReactNode; themeC
         </div>
       </header>
 
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 pb-24 md:pb-10">
+      <main key={activeIndex} className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 pb-24 md:pb-10 page-enter">
         {children}
       </main>
 
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-background/90 backdrop-blur border-t border-border">
-        <div className="grid grid-cols-4 max-w-md mx-auto">
-          {navItems.map((it) => {
+        <div ref={mobile.containerRef} className="grid grid-cols-4 max-w-md mx-auto relative">
+          <span
+            aria-hidden
+            className="nav-pill nav-pill-mobile"
+            style={{
+              opacity: mobile.box.ready ? 1 : 0,
+              transform: `translateX(${mobile.box.left}px) scaleX(${mobile.stretching ? 1.22 : 1})`,
+              width: mobile.box.width,
+              ["--pill-color" as string]: pageColor,
+            }}
+          />
+          {navItems.map((it, i) => {
             const Icon = it.icon;
             return (
               <Link
                 key={it.to}
                 to={it.to}
+                ref={mobile.setItemRef(i)}
                 style={{ ["--tab-color" as string]: it.color }}
-                className="flex flex-col items-center justify-center py-2.5 text-xs text-muted-foreground"
-                activeProps={{ className: "flex flex-col items-center justify-center py-2.5 text-xs text-[var(--tab-color)]" }}
+                className="relative z-10 flex flex-col items-center justify-center py-2.5 text-xs text-muted-foreground transition-colors duration-300"
+                activeProps={{ className: "relative z-10 flex flex-col items-center justify-center py-2.5 text-xs text-[var(--tab-color)] transition-colors duration-300" }}
                 activeOptions={{ exact: it.to === "/" }}
               >
-                <Icon className="h-5 w-5 mb-0.5" />
+                <Icon className="h-5 w-5 mb-0.5 transition-transform duration-300" />
                 <span className="font-display tracking-wide">{it.label}</span>
               </Link>
             );
