@@ -774,7 +774,69 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
         Team size: {battingTeamSizeForUI}. {isAdmin ? "Saves automatically with every ball." : "Read-only view."}
       </p>
       <Celebration kind={celebration.kind} name={celebration.name} onDone={() => setCelebration({ kind: null })} />
+      {isAdmin && addPlayerOpen && (
+        <AddPlayerMidDialog
+          teamAName={match.team_a_name}
+          teamBName={match.team_b_name}
+          defaultTeam={state.battingTeam}
+          pending={addPlayerMid.isPending}
+          error={(addPlayerMid.error as Error | null)?.message ?? null}
+          onClose={() => setAddPlayerOpen(false)}
+          onSubmit={(v) => addPlayerMid.mutate(v)}
+        />
+      )}
     </AppShell>
+  );
+}
+
+function AddPlayerMidDialog({
+  teamAName, teamBName, defaultTeam, pending, error, onClose, onSubmit,
+}: {
+  teamAName: string; teamBName: string; defaultTeam: Team; pending: boolean; error: string | null;
+  onClose: () => void; onSubmit: (v: { name: string; role: string; team: Team }) => void;
+}) {
+  const [name, setName] = useState("");
+  const [role, setRole] = useState<PlayerRole>("All-rounder");
+  const [team, setTeam] = useState<Team>(defaultTeam);
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="glass-card rounded-3xl p-5 w-full max-w-sm">
+        <h3 className="font-display tracking-widest text-lg mb-3">Add player mid-match</h3>
+        <input
+          autoFocus
+          className="w-full bg-input/40 border border-border rounded-md px-3 py-2 mb-2"
+          placeholder="Player name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <select
+          className="w-full bg-input/40 border border-border rounded-md px-3 py-2 mb-2 text-foreground"
+          value={role}
+          onChange={(e) => setRole(e.target.value as PlayerRole)}
+        >
+          {PLAYER_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+        </select>
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          {(["A", "B"] as Team[]).map((t) => (
+            <button key={t} onClick={() => setTeam(t)}
+              className={`btn-chalk rounded-md py-2 text-xs ${team === t ? "bg-primary/25 text-primary border-primary/60" : ""}`}>
+              {t === "A" ? teamAName : teamBName}
+            </button>
+          ))}
+        </div>
+        {error ? <p className="text-destructive text-sm mb-2">{error}</p> : null}
+        <div className="flex gap-2">
+          <button onClick={onClose} className="btn-chalk rounded-md px-3 py-2 text-sm flex-1">Cancel</button>
+          <button
+            disabled={pending || !name.trim()}
+            onClick={() => onSubmit({ name, role, team })}
+            className="btn-chalk rounded-md px-3 py-2 text-sm flex-1 bg-primary/20 text-primary"
+          >
+            {pending ? "Adding…" : "Add"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
