@@ -15,7 +15,7 @@ export function Celebration({ kind, name, onDone }: { kind: CelebrationKind; nam
     const t = setTimeout(() => {
       setShow(false);
       onDone?.();
-    }, kind === "hundred" ? 3400 : 2600);
+    }, kind === "hundred" ? 3400 : kind === "hattrick" ? 3000 : 2600);
     return () => clearTimeout(t);
   }, [kind, onDone]);
 
@@ -35,7 +35,7 @@ export function Celebration({ kind, name, onDone }: { kind: CelebrationKind; nam
     kind === "fifty" ? "text-primary" :
     kind === "hattrick" ? "text-destructive" : "text-accent";
 
-  const confetti = Array.from({ length: kind === "hundred" ? 60 : 36 });
+  const confetti = Array.from({ length: kind === "hundred" ? 70 : kind === "hattrick" ? 60 : 36 });
 
   return (
     <div className="fixed inset-0 z-[100] pointer-events-none overflow-hidden flex items-center justify-center">
