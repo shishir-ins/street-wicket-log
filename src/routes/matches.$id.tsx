@@ -413,6 +413,34 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
     },
   });
 
+  // Add a brand-new player in the middle of a match and slot them into a team
+  const [addPlayerOpen, setAddPlayerOpen] = useState(false);
+  const addPlayerMid = useMutation({
+    mutationFn: async (v: { name: string; role: string; team: "A" | "B" }) => {
+      const trimmed = v.name.trim();
+      if (!trimmed) throw new Error("Name required");
+      const { data, error } = await supabase
+        .from("players")
+        .insert({ name: trimmed, role: v.role })
+        .select("id")
+        .single();
+      if (error) throw error;
+      const col = v.team === "A" ? "team_a_players" : "team_b_players";
+      const current = ((v.team === "A" ? match.team_a_players : match.team_b_players) as unknown as string[]) ?? [];
+      const { error: e2 } = await supabase
+        .from("matches")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .update({ [col]: [...current, data.id] } as any)
+        .eq("id", match.id);
+      if (e2) throw e2;
+    },
+    onSuccess: () => {
+      setAddPlayerOpen(false);
+      qc.invalidateQueries({ queryKey: ["players"] });
+      qc.invalidateQueries({ queryKey: ["match", match.id] });
+    },
+  });
+
   // Score click handler
   const onRun = (n: number) => {
     recordBall.mutate({ runs: n, extraType: extraMod ?? null });
