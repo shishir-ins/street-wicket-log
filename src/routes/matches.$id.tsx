@@ -153,9 +153,9 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
     for (const pid of Object.keys(batting)) {
       const prev = milestoneRef.current.batting[pid] ?? 0;
       const curr = batting[pid].runs;
-      if (prev < 100 && curr >= 100) { fired = { kind: "hundred", name: byId[pid]?.name }; break; }
-      if (prev < 50 && curr >= 50) fired = { kind: "fifty", name: byId[pid]?.name };
       milestoneRef.current.batting[pid] = curr;
+      if (prev < 100 && curr >= 100) { fired = { kind: "hundred", name: byId[pid]?.name }; continue; }
+      if (prev < 50 && curr >= 50 && !fired) fired = { kind: "fifty", name: byId[pid]?.name };
     }
     // Hat-trick — any bowler's count increased
     for (const pid of Object.keys(hats)) {
