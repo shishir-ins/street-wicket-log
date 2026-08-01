@@ -624,7 +624,7 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
             </p>
           )}
           {/* 1D + mid-innings changes */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-3">
             <button disabled={isPaused || recordBall.isPending} onClick={onOneDeclared}
               className="btn-chalk rounded-md py-3 text-sm bg-primary/20 text-primary border-primary/50 font-display tracking-wider">
               1D
@@ -637,6 +637,8 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
               className="btn-chalk rounded-md py-3 text-xs">Change striker</button>
             <button disabled={isPaused} onClick={() => setReplaceBatsman("nonStriker")}
               className="btn-chalk rounded-md py-3 text-xs">Change non-striker</button>
+            <button onClick={() => setAddPlayerOpen(true)}
+              className="btn-chalk rounded-md py-3 text-xs">+ Add player</button>
           </div>
           <div className="mt-2">
             <button
