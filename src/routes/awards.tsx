@@ -23,6 +23,8 @@ export const Route = createFileRoute("/awards")({
 function AwardsPage() {
   const playersQ = useQuery({
     queryKey: ["players"],
+    refetchInterval: 2000,
+    staleTime: 0,
     queryFn: async () => {
       const { data, error } = await supabase.from("players").select("*").order("name");
       if (error) throw error;
@@ -31,6 +33,8 @@ function AwardsPage() {
   });
   const matchesQ = useQuery({
     queryKey: ["matches"],
+    refetchInterval: 2000,
+    staleTime: 0,
     queryFn: async () => {
       const { data, error } = await supabase.from("matches").select("*").order("match_date", { ascending: false });
       if (error) throw error;
@@ -39,6 +43,9 @@ function AwardsPage() {
   });
   const ballsQ = useQuery({
     queryKey: ["balls", "all"],
+    refetchInterval: 2000,
+    refetchOnWindowFocus: true,
+    staleTime: 0,
     queryFn: async () => {
       const { data, error } = await supabase.from("balls").select("*").order("created_at");
       if (error) throw error;
