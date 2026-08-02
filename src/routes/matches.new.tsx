@@ -50,6 +50,32 @@ function NewMatch() {
   const [teamB, setTeamB] = useState<string[]>([]);
   const [commonId, setCommonId] = useState<string>("");
   const [battingFirst, setBattingFirst] = useState<Team>("A");
+  // Toss
+  const [tossCall, setTossCall] = useState<"heads" | "tails">("heads");
+  const [flipping, setFlipping] = useState(false);
+  const [coin, setCoin] = useState<"heads" | "tails" | null>(null);
+  const [tossWinner, setTossWinner] = useState<Team | null>(null);
+  const [tossDecision, setTossDecision] = useState<"bat" | "bowl" | null>(null);
+
+  const flipCoin = () => {
+    if (flipping) return;
+    setFlipping(true);
+    setCoin(null);
+    setTossWinner(null);
+    setTossDecision(null);
+    const result: "heads" | "tails" = Math.random() < 0.5 ? "heads" : "tails";
+    setTimeout(() => {
+      setCoin(result);
+      setTossWinner(result === tossCall ? "A" : "B");
+      setFlipping(false);
+    }, 1800);
+  };
+  const chooseDecision = (d: "bat" | "bowl") => {
+    if (!tossWinner) return;
+    setTossDecision(d);
+    const batter: Team = d === "bat" ? tossWinner : (tossWinner === "A" ? "B" : "A");
+    setBattingFirst(batter);
+  };
   const [strikerId, setStrikerId] = useState("");
   const [nonStrikerId, setNonStrikerId] = useState("");
   const [bowlerId, setBowlerId] = useState("");
@@ -294,20 +320,61 @@ function NewMatch() {
       {step === 2 && (
         <div className="space-y-5 animate-chalk-in">
           <div className="chalk-board p-5">
-            <h2 className="font-display tracking-widest mb-4">Who bats first?</h2>
-            <div className="grid grid-cols-2 gap-3">
-              {(["A","B"] as Team[]).map((t) => (
-                <button key={t} type="button" onClick={() => setBattingFirst(t)}
-                  className={`p-5 rounded-md border text-center transition ${battingFirst===t ? "bg-primary/20 border-primary/60 text-primary" : "border-border bg-background/30 hover:bg-secondary"}`}>
-                  <div className="font-display text-2xl tracking-widest">{t === "A" ? teamAName : teamBName}</div>
-                  <div className="text-xs text-muted-foreground mt-1">bats first</div>
+            <h2 className="font-display tracking-widest mb-1">The Toss</h2>
+            <p className="font-chalk text-muted-foreground mb-4">
+              <span className="text-primary">{teamAName}</span> calls it. Spin the coin.
+            </p>
+            <div className="grid grid-cols-2 gap-3 max-w-xs mb-5">
+              {(["heads", "tails"] as const).map((c) => (
+                <button key={c} type="button" disabled={flipping} onClick={() => setTossCall(c)}
+                  className={`btn-chalk rounded-md py-2 text-sm font-display tracking-widest ${tossCall === c ? "bg-primary/20 text-primary border-primary/60" : ""}`}>
+                  {c.toUpperCase()}
                 </button>
               ))}
             </div>
+            <div className="flex flex-col items-center gap-4 py-2">
+              <div className={`coin ${flipping ? "coin-flipping" : ""}`}>
+                <span className="font-display tracking-widest text-xl">
+                  {flipping ? "" : coin ? (coin === "heads" ? "H" : "T") : "?"}
+                </span>
+              </div>
+              <button type="button" onClick={flipCoin} disabled={flipping}
+                className="rounded-full bg-primary text-primary-foreground px-6 py-2 font-display tracking-widest disabled:opacity-50">
+                {flipping ? "Spinning…" : coin ? "Flip again" : "Flip the coin"}
+              </button>
+              {coin && tossWinner && (
+                <p className="font-chalk text-lg text-center">
+                  It's <span className="text-accent">{coin.toUpperCase()}</span> —{" "}
+                  <span className="text-primary">{tossWinner === "A" ? teamAName : teamBName}</span> won the toss.
+                </p>
+              )}
+            </div>
+            {tossWinner && (
+              <div className="mt-4">
+                <h3 className="font-display tracking-widest mb-2 text-sm text-muted-foreground">
+                  {tossWinner === "A" ? teamAName : teamBName} elects to…
+                </h3>
+                <div className="grid grid-cols-2 gap-3">
+                  {(["bat", "bowl"] as const).map((d) => (
+                    <button key={d} type="button" onClick={() => chooseDecision(d)}
+                      className={`p-5 rounded-md border text-center transition ${tossDecision === d ? "bg-primary/20 border-primary/60 text-primary" : "border-border bg-background/30 hover:bg-secondary"}`}>
+                      <div className="font-display text-2xl tracking-widest">{d === "bat" ? "BAT" : "BOWL"}</div>
+                      <div className="text-xs text-muted-foreground mt-1">first</div>
+                    </button>
+                  ))}
+                </div>
+                {tossDecision && (
+                  <p className="font-chalk text-muted-foreground mt-3">
+                    {battingFirst === "A" ? teamAName : teamBName} bats first.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
           <div className="flex justify-between">
             <button onClick={() => setStep(1)} className="btn-chalk rounded-md px-5 py-2">← Back</button>
-            <button onClick={() => setStep(3)} className="btn-chalk rounded-md px-5 py-2 bg-primary/20 text-primary">Next →</button>
+            <button onClick={() => setStep(3)} disabled={!tossDecision}
+              className="btn-chalk rounded-md px-5 py-2 bg-primary/20 text-primary disabled:opacity-40">Next →</button>
           </div>
         </div>
       )}
