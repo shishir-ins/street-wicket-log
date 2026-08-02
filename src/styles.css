@@ -374,3 +374,25 @@
   .nav-pill { transition: opacity 0.2s ease; }
   .page-enter, .page-enter > * { animation: none; }
 }
+
+/* -------------------- Toss coin -------------------- */
+.coin {
+  width: 88px;
+  height: 88px;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: oklch(0.2 0 0);
+  background:
+    radial-gradient(circle at 32% 28%, oklch(0.96 0.09 95), oklch(0.78 0.13 85) 55%, oklch(0.62 0.12 80));
+  border: 3px solid color-mix(in oklab, var(--page-color, oklch(0.8 0.15 90)) 55%, oklch(0.7 0.12 85));
+  box-shadow: 0 10px 30px -12px color-mix(in oklab, var(--page-color, black) 70%, transparent);
+  transform-style: preserve-3d;
+}
+@keyframes coin-spin {
+  0% { transform: rotateY(0deg) translateY(0); }
+  50% { transform: rotateY(1080deg) translateY(-40px); }
+  100% { transform: rotateY(2160deg) translateY(0); }
+}
+.coin-flipping { animation: coin-spin 1.8s cubic-bezier(0.3, 0, 0.3, 1); }
