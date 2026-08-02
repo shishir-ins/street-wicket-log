@@ -343,8 +343,9 @@
     opacity 0.25s ease;
 }
 .nav-pill-mobile {
-  height: calc(100% - 10px);
-  margin-top: calc((100% - 10px) / -2);
+  top: 2px;
+  height: 40px;
+  margin-top: 0;
 }
 
 /* -------------------- Page / element enter transitions -------------------- */
@@ -357,17 +358,17 @@
   100% { opacity: 1; transform: translateY(0); }
 }
 .page-enter {
-  animation: page-enter-anim 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: page-enter-anim 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .page-enter > * {
-  animation: child-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: child-rise 1s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
-.page-enter > *:nth-child(1) { animation-delay: 0.04s; }
-.page-enter > *:nth-child(2) { animation-delay: 0.09s; }
-.page-enter > *:nth-child(3) { animation-delay: 0.14s; }
-.page-enter > *:nth-child(4) { animation-delay: 0.19s; }
-.page-enter > *:nth-child(5) { animation-delay: 0.24s; }
-.page-enter > *:nth-child(n + 6) { animation-delay: 0.28s; }
+.page-enter > *:nth-child(1) { animation-delay: 0.06s; }
+.page-enter > *:nth-child(2) { animation-delay: 0.14s; }
+.page-enter > *:nth-child(3) { animation-delay: 0.22s; }
+.page-enter > *:nth-child(4) { animation-delay: 0.3s; }
+.page-enter > *:nth-child(5) { animation-delay: 0.38s; }
+.page-enter > *:nth-child(n + 6) { animation-delay: 0.44s; }
 
 @media (prefers-reduced-motion: reduce) {
   .nav-pill { transition: opacity 0.2s ease; }
