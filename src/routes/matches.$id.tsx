@@ -266,17 +266,20 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
       const newWickets = totals.wickets + (payload.isWicket ? 1 : 0);
       const totalRunsThisBall = batRuns + extraRuns;
 
+      // Last man standing: only one batsman left — he keeps strike no matter what.
+      const lastManStanding = !state.nonStrikerId;
+
       // Strike swap on odd run counts (bat or bye/leg-bye); wide adds no strike-altering run except via extras taken
       let newStrikerId = state.strikerId;
       let newNonStrikerId = state.nonStrikerId;
       const runsForStrikeSwap = batRuns + (payload.extraType === "bye" || payload.extraType === "leg_bye" ? payload.runs : 0);
-      if (runsForStrikeSwap % 2 === 1) {
+      if (!lastManStanding && runsForStrikeSwap % 2 === 1) {
         [newStrikerId, newNonStrikerId] = [newNonStrikerId, newStrikerId];
       }
 
       // End of over — swap strike + need new bowler
       const overEnded = isLegal && newLegalBalls % 6 === 0 && newLegalBalls > 0;
-      if (overEnded) {
+      if (overEnded && !lastManStanding) {
         [newStrikerId, newNonStrikerId] = [newNonStrikerId, newStrikerId];
       }
 
@@ -284,7 +287,9 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
       const outBatsmen = [...(state.outBatsmen ?? [])];
       if (payload.isWicket && payload.outPlayerId) outBatsmen.push(payload.outPlayerId);
 
-      const allOut = newWickets >= battingTeamSize - 1;
+      // Everyone bats: the innings ends only when every batter in the team is out.
+      const battersRemaining = battingTeamSize - newWickets;
+      const allOut = battersRemaining <= 0;
       const oversComplete = newLegalBalls >= totalBalls;
       const chasedDown = innings === 2 && target != null && (totals.runs + totalRunsThisBall) >= target;
       const inningsOver = allOut || oversComplete || chasedDown;
@@ -306,6 +311,12 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
           // running between wickets out — could be either; treat as striker out by default
           nextState.strikerId = null;
         }
+        // Exactly one batter left → he bats alone and always keeps strike.
+        if (battersRemaining === 1 && !allOut) {
+          const survivor = nextState.strikerId ?? nextState.nonStrikerId ?? null;
+          nextState.strikerId = survivor;
+          nextState.nonStrikerId = null;
+        }
       }
 
       // Persist
@@ -325,7 +336,11 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
         .eq("id", match.id);
       if (merr) throw merr;
 
-      return { overEnded, inningsOver, needNewBatsman: !!payload.isWicket && !inningsOver };
+      return {
+        overEnded,
+        inningsOver,
+        needNewBatsman: !!payload.isWicket && !inningsOver && battersRemaining >= 2,
+      };
     },
     onSuccess: async (r) => {
       setExtraMod(null);
