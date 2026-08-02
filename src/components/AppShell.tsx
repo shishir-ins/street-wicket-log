@@ -26,55 +26,79 @@ const activeIndexFor = (path: string): number => {
 
 type PillBox = { left: number; width: number; ready: boolean };
 
-/** Measures the active nav item and animates a single pill between items. */
-function usePill(activeIndex: number) {
+/**
+ * Measures nav items and animates one pill between them.
+ * mode "circle": the pill rests as a circle centred on each item (mobile icons).
+ * mode "auto":   the pill rests at the item's own width (desktop text tabs).
+ * While travelling it stretches to span both the old and the new resting spot,
+ * then snaps back to its resting shape.
+ */
+function usePill(activeIndex: number, mode: "circle" | "auto", circleSize = 46) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const itemRefs = useRef<Array<HTMLAnchorElement | null>>([]);
   const [box, setBox] = useState<PillBox>({ left: 0, width: 0, ready: false });
-  const [stretching, setStretching] = useState(false);
   const prevIndex = useRef(activeIndex);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const measure = useCallback(() => {
-    const el = itemRefs.current[activeIndex];
-    const parent = containerRef.current;
-    if (!el || !parent) return;
-    const p = parent.getBoundingClientRect();
-    const r = el.getBoundingClientRect();
-    setBox({ left: r.left - p.left, width: r.width, ready: true });
-  }, [activeIndex]);
+  const restFor = useCallback(
+    (index: number): { left: number; width: number } | null => {
+      const el = itemRefs.current[index];
+      const parent = containerRef.current;
+      if (!el || !parent) return null;
+      const p = parent.getBoundingClientRect();
+      const r = el.getBoundingClientRect();
+      const center = r.left - p.left + r.width / 2;
+      const width = mode === "circle" ? circleSize : r.width;
+      return { left: center - width / 2, width };
+    },
+    [mode, circleSize],
+  );
+
+  const settle = useCallback(() => {
+    const rest = restFor(activeIndex);
+    if (rest) setBox({ ...rest, ready: true });
+  }, [restFor, activeIndex]);
 
   useLayoutEffect(() => {
-    measure();
-  }, [measure]);
+    const from = prevIndex.current;
+    const to = activeIndex;
+    if (from === to) {
+      settle();
+      return;
+    }
+    prevIndex.current = to;
+    const a = restFor(from);
+    const b = restFor(to);
+    if (a && b) {
+      const left = Math.min(a.left, b.left);
+      const right = Math.max(a.left + a.width, b.left + b.width);
+      setBox({ left, width: right - left, ready: true });
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = setTimeout(settle, 190);
+    } else {
+      settle();
+    }
+    return () => { if (timer.current) clearTimeout(timer.current); };
+  }, [activeIndex, restFor, settle]);
 
   useEffect(() => {
-    const onResize = () => measure();
+    const onResize = () => settle();
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
-  }, [measure]);
-
-  // Elongate while travelling between tabs.
-  useEffect(() => {
-    if (prevIndex.current === activeIndex) return;
-    prevIndex.current = activeIndex;
-    setStretching(true);
-    const t = setTimeout(() => setStretching(false), 260);
-    return () => clearTimeout(t);
-  }, [activeIndex]);
+  }, [settle]);
 
   const setItemRef = (i: number) => (el: HTMLAnchorElement | null) => {
     itemRefs.current[i] = el;
   };
 
-  return { containerRef, setItemRef, box, stretching };
+  return { containerRef, setItemRef, box };
 }
-
 export function AppShell({ children, themeColor }: { children: ReactNode; themeColor?: string }) {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const pageColor = themeColor ?? pageColorFor(path);
   const activeIndex = activeIndexFor(path);
-  const desktop = usePill(activeIndex);
-  const mobile = usePill(activeIndex);
+  const desktop = usePill(activeIndex, "auto");
+  const mobile = usePill(activeIndex, "circle", 46);
 
   return (
     <div className="min-h-screen flex flex-col page-theme" style={{ ["--page-color" as string]: pageColor }}>
@@ -95,7 +119,7 @@ export function AppShell({ children, themeColor }: { children: ReactNode; themeC
               className="nav-pill"
               style={{
                 opacity: desktop.box.ready ? 1 : 0,
-                transform: `translateX(${desktop.box.left}px) scaleX(${desktop.stretching ? 1.18 : 1})`,
+                transform: `translateX(${desktop.box.left}px)`,
                 width: desktop.box.width,
                 ["--pill-color" as string]: pageColor,
               }}
@@ -135,7 +159,7 @@ export function AppShell({ children, themeColor }: { children: ReactNode; themeC
             className="nav-pill nav-pill-mobile"
             style={{
               opacity: mobile.box.ready ? 1 : 0,
-              transform: `translateX(${mobile.box.left}px) scaleX(${mobile.stretching ? 1.22 : 1})`,
+              transform: `translateX(${mobile.box.left}px)`,
               width: mobile.box.width,
               ["--pill-color" as string]: pageColor,
             }}
