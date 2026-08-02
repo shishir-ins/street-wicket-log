@@ -346,6 +346,8 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
       setRedoStack([]); // any new ball invalidates redo history
       await qc.invalidateQueries({ queryKey: ["match", match.id] });
       await qc.invalidateQueries({ queryKey: ["balls", match.id] });
+      qc.invalidateQueries({ queryKey: ["balls", "all"] });
+      qc.invalidateQueries({ queryKey: ["matches"] });
       if (r?.inningsOver) {
         setInningsBreakDialog(true);
       } else {
