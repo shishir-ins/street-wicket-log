@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 import { useAdmin, AdminLockButton } from "@/lib/admin";
 import { PlayerChip } from "@/components/PlayerChip";
-import { PLAYER_ROLES, type PlayerRole } from "@/lib/cricket";
 import { Celebration, type CelebrationKind } from "@/components/Celebration";
 
 export const Route = createFileRoute("/matches/$id")({
