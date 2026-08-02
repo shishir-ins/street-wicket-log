@@ -428,30 +428,25 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
     },
   });
 
-  // Add a brand-new player in the middle of a match and slot them into a team
+  // Add an existing squad player into one of the teams mid-match
   const [addPlayerOpen, setAddPlayerOpen] = useState(false);
   const addPlayerMid = useMutation({
-    mutationFn: async (v: { name: string; role: string; team: "A" | "B" }) => {
-      const trimmed = v.name.trim();
-      if (!trimmed) throw new Error("Name required");
-      const { data, error } = await supabase
-        .from("players")
-        .insert({ name: trimmed, role: v.role })
-        .select("id")
-        .single();
-      if (error) throw error;
+    mutationFn: async (v: { playerId: string; team: Team }) => {
+      if (!v.playerId) throw new Error("Pick a player from the squad");
       const col = v.team === "A" ? "team_a_players" : "team_b_players";
       const current = ((v.team === "A" ? match.team_a_players : match.team_b_players) as unknown as string[]) ?? [];
-      const { error: e2 } = await supabase
+      if (current.includes(v.playerId)) throw new Error("Player is already in that team");
+      const next = Array.from(new Set([...current, v.playerId]));
+      const { error } = await supabase
         .from("matches")
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .update({ [col]: [...current, data.id] } as any)
+        .update({ [col]: next } as any)
         .eq("id", match.id);
-      if (e2) throw e2;
+      if (error) throw error;
     },
     onSuccess: () => {
       setAddPlayerOpen(false);
-      qc.invalidateQueries({ queryKey: ["players"] });
+      addPlayerMid.reset();
       qc.invalidateQueries({ queryKey: ["match", match.id] });
     },
   });
@@ -794,9 +789,12 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
           teamAName={match.team_a_name}
           teamBName={match.team_b_name}
           defaultTeam={state.battingTeam}
+          players={players}
+          teamAIds={(match.team_a_players as unknown as string[]) ?? []}
+          teamBIds={(match.team_b_players as unknown as string[]) ?? []}
           pending={addPlayerMid.isPending}
           error={(addPlayerMid.error as Error | null)?.message ?? null}
-          onClose={() => setAddPlayerOpen(false)}
+          onClose={() => { setAddPlayerOpen(false); addPlayerMid.reset(); }}
           onSubmit={(v) => addPlayerMid.mutate(v)}
         />
       )}
@@ -805,32 +803,33 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
 }
 
 function AddPlayerMidDialog({
-  teamAName, teamBName, defaultTeam, pending, error, onClose, onSubmit,
+  teamAName, teamBName, defaultTeam, players, teamAIds, teamBIds, pending, error, onClose, onSubmit,
 }: {
-  teamAName: string; teamBName: string; defaultTeam: Team; pending: boolean; error: string | null;
-  onClose: () => void; onSubmit: (v: { name: string; role: string; team: Team }) => void;
+  teamAName: string; teamBName: string; defaultTeam: Team;
+  players: Player[]; teamAIds: string[]; teamBIds: string[];
+  pending: boolean; error: string | null;
+  onClose: () => void; onSubmit: (v: { playerId: string; team: Team }) => void;
 }) {
-  const [name, setName] = useState("");
-  const [role, setRole] = useState<PlayerRole>("All-rounder");
   const [team, setTeam] = useState<Team>(defaultTeam);
+  const [playerId, setPlayerId] = useState("");
+  const inMatch = new Set([...teamAIds, ...teamBIds]);
+  const available = players.filter((p) => !inMatch.has(p.id));
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="glass-card rounded-3xl p-5 w-full max-w-sm">
-        <h3 className="font-display tracking-widest text-lg mb-3">Add player mid-match</h3>
-        <input
-          autoFocus
-          className="w-full bg-input/40 border border-border rounded-md px-3 py-2 mb-2"
-          placeholder="Player name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
+        <h3 className="font-display tracking-widest text-lg mb-1">Add player from squad</h3>
+        <p className="text-xs text-muted-foreground font-chalk mb-3">Only players already in the squad can join mid-match.</p>
         <select
           className="w-full bg-input/40 border border-border rounded-md px-3 py-2 mb-2 text-foreground"
-          value={role}
-          onChange={(e) => setRole(e.target.value as PlayerRole)}
+          value={playerId}
+          onChange={(e) => setPlayerId(e.target.value)}
         >
-          {PLAYER_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+          <option value="">— select a squad player —</option>
+          {available.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
         </select>
+        {available.length === 0 ? (
+          <p className="text-xs text-muted-foreground font-chalk mb-2">Everyone in the squad is already playing.</p>
+        ) : null}
         <div className="grid grid-cols-2 gap-2 mb-3">
           {(["A", "B"] as Team[]).map((t) => (
             <button key={t} onClick={() => setTeam(t)}
@@ -843,8 +842,8 @@ function AddPlayerMidDialog({
         <div className="flex gap-2">
           <button onClick={onClose} className="btn-chalk rounded-md px-3 py-2 text-sm flex-1">Cancel</button>
           <button
-            disabled={pending || !name.trim()}
-            onClick={() => onSubmit({ name, role, team })}
+            disabled={pending || !playerId}
+            onClick={() => onSubmit({ playerId, team })}
             className="btn-chalk rounded-md px-3 py-2 text-sm flex-1 bg-primary/20 text-primary"
           >
             {pending ? "Adding…" : "Add"}
