@@ -1,7 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { computeInningsTotals, oversString, type Ball, type Match } from "@/lib/cricket";
+import { computeInningsTotals, oversString, type Ball, type Match, type MatchState } from "@/lib/cricket";
 
 const LIVE = ["live", "innings_break", "match_break"];
 
@@ -44,12 +44,11 @@ export function LiveBar() {
   if (path.startsWith(`/matches/${match.id}`)) return null;
 
   const balls = ballsQ.data ?? [];
-  const innings = (match.current_innings as number) ?? 1;
+  const state = (match.state as unknown as MatchState) ?? null;
+  const innings = state?.innings ?? 1;
+  const battingSide = state?.battingTeam ?? (match.batting_first as "A" | "B");
   const totals = computeInningsTotals(balls, innings);
-  const battingTeam =
-    (innings === 1 ? match.batting_first : match.batting_first === "A" ? "B" : "A") === "A"
-      ? match.team_a_name
-      : match.team_b_name;
+  const battingTeam = battingSide === "A" ? match.team_a_name : match.team_b_name;
 
   return (
     <Link
