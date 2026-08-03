@@ -6,8 +6,17 @@
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#1a2820",
-  "theme_color": "#1a2820",
+  "background_color": "#050505",
+  "theme_color": "#050505",
+  "shortcuts": [
+    {
+      "name": "Live match",
+      "short_name": "Live",
+      "description": "Open the match being played right now",
+      "url": "/live",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ],
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
