@@ -5,6 +5,7 @@ import { AppShell } from "@/components/AppShell";
 import type { Match } from "@/lib/cricket";
 import { Flame, Activity, Calendar, Trophy } from "lucide-react";
 import { useAdmin, AdminLockButton } from "@/lib/admin";
+import { PinLiveButton } from "@/components/PinLive";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -79,6 +80,11 @@ function Dashboard() {
           {isAdmin && (
             <div className="mt-3 flex justify-end"><AdminLockButton /></div>
           )}
+          <div className="mt-5 n-rule" />
+          <div className="mt-4 flex items-center justify-between gap-3 flex-wrap">
+            <span className="n-label">ADD TO HOME SCREEN · OPENS THE LIVE MATCH</span>
+            <PinLiveButton />
+          </div>
         </div>
       </section>
 
