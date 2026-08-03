@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { useRouterState } from "@tanstack/react-router";
 import { Home, Users, ListChecks, PlayCircle, Trophy } from "lucide-react";
+import { LiveBar } from "@/components/LiveBar";
 
 const navItems = [
   { to: "/" as const, label: "Pitch", icon: Home, color: "#22c55e" },        // green
@@ -151,6 +152,8 @@ export function AppShell({ children, themeColor }: { children: ReactNode; themeC
       <main key={activeIndex} className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 pb-24 md:pb-10 page-enter">
         {children}
       </main>
+
+      <LiveBar />
 
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-background/90 backdrop-blur border-t border-border">
         <div ref={mobile.containerRef} className="grid grid-cols-4 max-w-md mx-auto relative">
