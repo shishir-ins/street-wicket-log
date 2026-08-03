@@ -870,6 +870,83 @@ function BallPill({ label, wicket, dim }: { label: string; wicket?: boolean; dim
   return <span className={`px-2.5 py-1 rounded-md border text-sm font-display tracking-wide ${color} ${dim ? "opacity-60" : ""}`}>{label}</span>;
 }
 
+// ---------- LIVE TICKER (crex-style dot strip + reactions) ----------
+function LiveTicker({ currentOver, prevOver }: { currentOver?: OverEvent; prevOver?: OverEvent }) {
+  const cur = currentOver?.balls ?? [];
+  const last = cur[cur.length - 1];
+  const seen = useRef<string>("");
+  const [flash, setFlash] = useState<"six" | "four" | "wicket" | null>(null);
+
+  useEffect(() => {
+    const key = `${currentOver?.over ?? -1}:${cur.length}:${last?.label ?? ""}`;
+    if (!last || seen.current === key) { seen.current = key; return; }
+    const first = seen.current === "";
+    seen.current = key;
+    if (first) return; // don't fire on initial mount / page load
+    const kind = last.isWicket ? "wicket" : last.label === "6" ? "six" : last.label === "4" ? "four" : null;
+    if (!kind) return;
+    setFlash(kind);
+    if (kind === "six") {
+      document.body.classList.add("screen-shake");
+      window.setTimeout(() => document.body.classList.remove("screen-shake"), 600);
+    }
+    const t = window.setTimeout(() => setFlash(null), 1600);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentOver?.over, cur.length, last?.label, last?.isWicket]);
+
+  const cells = [...cur, ...Array.from({ length: Math.max(0, 6 - cur.length) }, () => null)];
+
+  return (
+    <div className={`chalk-board rounded-2xl p-4 mb-4 ${flash === "wicket" ? "wicket-flash" : ""} ${flash === "six" ? "six-glow" : ""}`}>
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <span className="n-label inline-flex items-center gap-2">
+          <Activity className="h-3 w-3" /> THIS OVER
+        </span>
+        <span className="n-label">
+          {cur.reduce((s, b) => s + b.runs, 0)} RUNS · OVER {(currentOver?.over ?? 0) + 1}
+        </span>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {cells.map((b, i) =>
+          b ? (
+            <span
+              key={`c-${i}`}
+              className={`ticker-dot ball-pop ${
+                b.isWicket ? "bg-destructive/30 text-destructive border-destructive/50"
+                  : b.label === "6" ? "bg-primary/30 text-primary border-primary/60"
+                  : b.label === "4" ? "bg-accent/30 text-accent border-accent/60"
+                  : b.runs === 0 ? "text-muted-foreground" : ""
+              }`}
+              style={{ animationDelay: `${Math.min(i, 5) * 0.02}s` }}
+            >
+              {b.label}
+            </span>
+          ) : (
+            <span key={`e-${i}`} className="ticker-dot opacity-25">·</span>
+          ),
+        )}
+      </div>
+      {prevOver && (
+        <>
+          <div className="n-rule my-3" />
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="n-label mr-1">PREV</span>
+            {prevOver.balls.map((b, i) => (
+              <span key={`p-${i}`} className="ticker-dot opacity-50 text-xs">{b.label}</span>
+            ))}
+          </div>
+        </>
+      )}
+      {flash && (
+        <div className="mt-3 text-center font-dot text-3xl tracking-widest animate-chalk-in">
+          {flash === "six" ? "MAXIMUM" : flash === "four" ? "FOUR" : "WICKET"}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ---------- INNINGS TABS (crex-style batting/bowling) ----------
 function InningsTabs({ match, balls, byId, currentInnings }: { match: Match; balls: Ball[]; byId: Record<string, Player>; currentInnings?: number }) {
   const teamA_ids = (match.team_a_players as unknown as string[]) ?? [];
