@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAllBalls } from "@/lib/fetch-balls";
 import { AppShell } from "@/components/AppShell";
 import { PlayerChip } from "@/components/PlayerChip";
 import {
@@ -46,11 +47,7 @@ function AwardsPage() {
     refetchInterval: 2000,
     refetchOnWindowFocus: true,
     staleTime: 0,
-    queryFn: async () => {
-      const { data, error } = await supabase.from("balls").select("*").order("created_at");
-      if (error) throw error;
-      return data as Ball[];
-    },
+    queryFn: () => fetchAllBalls(),
   });
 
   const players = playersQ.data ?? [];

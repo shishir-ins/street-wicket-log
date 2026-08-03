@@ -60,13 +60,9 @@ function PlayerProfile() {
   const ballsQ = useQuery({
     queryKey: ["balls", "player", id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("balls")
-        .select("*")
-        .or(`striker_id.eq.${id},bowler_id.eq.${id},fielder_id.eq.${id},out_player_id.eq.${id}`)
-        .order("created_at");
-      if (error) throw error;
-      return data as Ball[];
+      return fetchAllBalls((q) =>
+        q.or(`striker_id.eq.${id},bowler_id.eq.${id},fielder_id.eq.${id},out_player_id.eq.${id}`),
+      );
     },
   });
   const matchesQ = useQuery({
