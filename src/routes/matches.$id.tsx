@@ -7,7 +7,7 @@ import {
   computeBatting, computeBowling, computeFielding,
   computeInningsTotals, buildOverTimeline, oversString, runRate, requiredRunRate, playerMatchScore,
   commentaryFor, computePartnerships, computeHatTricks,
-  type Ball, type Player, type Match, type MatchState, type Team,
+  type Ball, type Player, type Match, type MatchState, type Team, type OverEvent,
 } from "@/lib/cricket";
 import {
   ArrowLeft, Undo2, Redo2, Pause, Play, Award, Activity, Share2, FileDown, MessageSquare, Users, Repeat,
@@ -598,24 +598,8 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
         </div>
       </div>
 
-      {/* Over timeline */}
-      <div className="chalk-board p-4 mb-4">
-        <div className="flex items-center gap-2 mb-2 text-xs font-display tracking-wider text-muted-foreground">
-          <Activity className="h-3.5 w-3.5" /> THIS OVER
-        </div>
-        <div className="flex flex-wrap gap-2 min-h-[2.5rem]">
-          {(currentOver?.balls ?? []).map((b, i) => <BallPill key={`c-${i}`} label={b.label} wicket={b.isWicket} />)}
-          {(currentOver?.balls ?? []).length === 0 && <span className="font-chalk text-muted-foreground">No balls yet.</span>}
-        </div>
-        {prevOver && (
-          <>
-            <div className="text-xs text-muted-foreground mt-3 font-display tracking-wider">PREVIOUS OVER</div>
-            <div className="flex flex-wrap gap-2 mt-1">
-              {prevOver.balls.map((b, i) => <BallPill key={`p-${i}`} label={b.label} wicket={b.isWicket} dim />)}
-            </div>
-          </>
-        )}
-      </div>
+      {/* Live ticker */}
+      <LiveTicker currentOver={currentOver} prevOver={prevOver} />
 
       {/* Scoring grid */}
       {isAdmin && !isInningsBreak && !needsBatsman && !pendingNextBowler && (
@@ -884,6 +868,83 @@ function BallPill({ label, wicket, dim }: { label: string; wicket?: boolean; dim
     : label === "6" ? "bg-primary/30 text-primary border-primary/50"
     : "bg-secondary text-foreground border-border";
   return <span className={`px-2.5 py-1 rounded-md border text-sm font-display tracking-wide ${color} ${dim ? "opacity-60" : ""}`}>{label}</span>;
+}
+
+// ---------- LIVE TICKER (crex-style dot strip + reactions) ----------
+function LiveTicker({ currentOver, prevOver }: { currentOver?: OverEvent; prevOver?: OverEvent }) {
+  const cur = currentOver?.balls ?? [];
+  const last = cur[cur.length - 1];
+  const seen = useRef<string>("");
+  const [flash, setFlash] = useState<"six" | "four" | "wicket" | null>(null);
+
+  useEffect(() => {
+    const key = `${currentOver?.over ?? -1}:${cur.length}:${last?.label ?? ""}`;
+    if (!last || seen.current === key) { seen.current = key; return; }
+    const first = seen.current === "";
+    seen.current = key;
+    if (first) return; // don't fire on initial mount / page load
+    const kind = last.isWicket ? "wicket" : last.label === "6" ? "six" : last.label === "4" ? "four" : null;
+    if (!kind) return;
+    setFlash(kind);
+    if (kind === "six") {
+      document.body.classList.add("screen-shake");
+      window.setTimeout(() => document.body.classList.remove("screen-shake"), 600);
+    }
+    const t = window.setTimeout(() => setFlash(null), 1600);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentOver?.over, cur.length, last?.label, last?.isWicket]);
+
+  const cells = [...cur, ...Array.from({ length: Math.max(0, 6 - cur.length) }, () => null)];
+
+  return (
+    <div className={`chalk-board rounded-2xl p-4 mb-4 ${flash === "wicket" ? "wicket-flash" : ""} ${flash === "six" ? "six-glow" : ""}`}>
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <span className="n-label inline-flex items-center gap-2">
+          <Activity className="h-3 w-3" /> THIS OVER
+        </span>
+        <span className="n-label">
+          {cur.reduce((s, b) => s + b.runs, 0)} RUNS · OVER {(currentOver?.over ?? 0) + 1}
+        </span>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {cells.map((b, i) =>
+          b ? (
+            <span
+              key={`c-${i}`}
+              className={`ticker-dot ball-pop ${
+                b.isWicket ? "bg-destructive/30 text-destructive border-destructive/50"
+                  : b.label === "6" ? "bg-primary/30 text-primary border-primary/60"
+                  : b.label === "4" ? "bg-accent/30 text-accent border-accent/60"
+                  : b.runs === 0 ? "text-muted-foreground" : ""
+              }`}
+              style={{ animationDelay: `${Math.min(i, 5) * 0.02}s` }}
+            >
+              {b.label}
+            </span>
+          ) : (
+            <span key={`e-${i}`} className="ticker-dot opacity-25">·</span>
+          ),
+        )}
+      </div>
+      {prevOver && (
+        <>
+          <div className="n-rule my-3" />
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="n-label mr-1">PREV</span>
+            {prevOver.balls.map((b, i) => (
+              <span key={`p-${i}`} className="ticker-dot opacity-50 text-xs">{b.label}</span>
+            ))}
+          </div>
+        </>
+      )}
+      {flash && (
+        <div className="mt-3 text-center font-dot text-3xl tracking-widest animate-chalk-in">
+          {flash === "six" ? "MAXIMUM" : flash === "four" ? "FOUR" : "WICKET"}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ---------- INNINGS TABS (crex-style batting/bowling) ----------
