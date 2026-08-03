@@ -598,24 +598,8 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
         </div>
       </div>
 
-      {/* Over timeline */}
-      <div className="chalk-board p-4 mb-4">
-        <div className="flex items-center gap-2 mb-2 text-xs font-display tracking-wider text-muted-foreground">
-          <Activity className="h-3.5 w-3.5" /> THIS OVER
-        </div>
-        <div className="flex flex-wrap gap-2 min-h-[2.5rem]">
-          {(currentOver?.balls ?? []).map((b, i) => <BallPill key={`c-${i}`} label={b.label} wicket={b.isWicket} />)}
-          {(currentOver?.balls ?? []).length === 0 && <span className="font-chalk text-muted-foreground">No balls yet.</span>}
-        </div>
-        {prevOver && (
-          <>
-            <div className="text-xs text-muted-foreground mt-3 font-display tracking-wider">PREVIOUS OVER</div>
-            <div className="flex flex-wrap gap-2 mt-1">
-              {prevOver.balls.map((b, i) => <BallPill key={`p-${i}`} label={b.label} wicket={b.isWicket} dim />)}
-            </div>
-          </>
-        )}
-      </div>
+      {/* Live ticker */}
+      <LiveTicker currentOver={currentOver} prevOver={prevOver} />
 
       {/* Scoring grid */}
       {isAdmin && !isInningsBreak && !needsBatsman && !pendingNextBowler && (
