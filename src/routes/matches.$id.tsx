@@ -511,7 +511,21 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
 
   const isPaused = match.status === "match_break";
   const isInningsBreak = match.status === "innings_break";
-  const needsBatsman = !state.strikerId || !state.nonStrikerId;
+  const availableBatsmen = battingTeamWithCommon.filter((pid) =>
+    pid !== state.strikerId && pid !== state.nonStrikerId &&
+    !(state.outBatsmen ?? []).includes(pid),
+  );
+  // Last man standing: nobody left to walk in — promote the survivor and never prompt.
+  const lastManOnly = availableBatsmen.length === 0;
+  const needsBatsman = (!state.strikerId || !state.nonStrikerId) && !lastManOnly;
+
+  useEffect(() => {
+    if (!isAdmin || isInningsBreak || !lastManOnly) return;
+    if (!state.strikerId && state.nonStrikerId) {
+      setStateMut.mutate({ strikerId: state.nonStrikerId, nonStrikerId: null });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, isInningsBreak, lastManOnly, state.strikerId, state.nonStrikerId]);
 
   return (
     <AppShell>
@@ -695,12 +709,9 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
         />
       )}
 
-      {isAdmin && (pendingNewBatsman || needsBatsman) && !isInningsBreak && (
+      {isAdmin && (pendingNewBatsman || needsBatsman) && !lastManOnly && !isInningsBreak && (
         <NewBatsmanDialog
-          availableIds={battingTeamWithCommon.filter((pid) =>
-            pid !== state.strikerId && pid !== state.nonStrikerId &&
-            !(state.outBatsmen ?? []).includes(pid),
-          )}
+          availableIds={availableBatsmen}
           byId={byId}
           onPick={(pid) => {
             const next: Partial<MatchState> = {};

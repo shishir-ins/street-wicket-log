@@ -8,6 +8,7 @@ import {
   type Ball, type Player, type Match,
 } from "@/lib/cricket";
 import { ArrowLeft, Camera } from "lucide-react";
+import { fetchAllBalls } from "@/lib/fetch-balls";
 import { useAdmin, AdminLockButton } from "@/lib/admin";
 
 export const Route = createFileRoute("/players/$id")({
@@ -60,13 +61,9 @@ function PlayerProfile() {
   const ballsQ = useQuery({
     queryKey: ["balls", "player", id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("balls")
-        .select("*")
-        .or(`striker_id.eq.${id},bowler_id.eq.${id},fielder_id.eq.${id},out_player_id.eq.${id}`)
-        .order("created_at");
-      if (error) throw error;
-      return data as Ball[];
+      return fetchAllBalls((q) =>
+        q.or(`striker_id.eq.${id},bowler_id.eq.${id},fielder_id.eq.${id},out_player_id.eq.${id}`),
+      );
     },
   });
   const matchesQ = useQuery({
