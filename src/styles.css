@@ -109,9 +109,11 @@
   --gradient-grass: linear-gradient(135deg, oklch(0.4 0.12 150), oklch(0.22 0.015 155));
   --shadow-board: 0 12px 40px -12px oklch(0 0 0 / 0.6), inset 0 1px 0 oklch(0.94 0.03 85 / 0.06);
   --shadow-chalk-glow: 0 0 24px -8px oklch(0.7 0.17 150 / 0.5);
-  --font-chalk: "Caveat", "Permanent Marker", cursive;
-  --font-display: "Bebas Neue", "Oswald", sans-serif;
-  --font-body: "Barlow", "Inter", sans-serif;
+  /* Nothing-OS inspired type system */
+  --font-dot: "Doto", "Bebas Neue", sans-serif;
+  --font-chalk: "JetBrains Mono", ui-monospace, monospace;
+  --font-display: "Doto", "Bebas Neue", sans-serif;
+  --font-body: "JetBrains Mono", "Barlow", ui-monospace, monospace;
 }
 
 .dark {
