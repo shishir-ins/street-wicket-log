@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as MatchesRouteImport } from './routes/matches'
+import { Route as LiveRouteImport } from './routes/live'
 import { Route as AwardsRouteImport } from './routes/awards'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
@@ -27,6 +28,11 @@ const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
 const MatchesRoute = MatchesRouteImport.update({
   id: '/matches',
   path: '/matches',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LiveRoute = LiveRouteImport.update({
+  id: '/live',
+  path: '/live',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AwardsRoute = AwardsRouteImport.update({
@@ -69,6 +75,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/awards': typeof AwardsRoute
+  '/live': typeof LiveRoute
   '/matches': typeof MatchesRouteWithChildren
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/matches/$id': typeof MatchesIdRoute
@@ -80,6 +87,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/awards': typeof AwardsRoute
+  '/live': typeof LiveRoute
   '/matches': typeof MatchesRouteWithChildren
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/matches/$id': typeof MatchesIdRoute
@@ -92,6 +100,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/awards': typeof AwardsRoute
+  '/live': typeof LiveRoute
   '/matches': typeof MatchesRouteWithChildren
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/matches/$id': typeof MatchesIdRoute
@@ -105,6 +114,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/awards'
+    | '/live'
     | '/matches'
     | '/sitemap.xml'
     | '/matches/$id'
@@ -116,6 +126,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/awards'
+    | '/live'
     | '/matches'
     | '/sitemap.xml'
     | '/matches/$id'
@@ -127,6 +138,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/awards'
+    | '/live'
     | '/matches'
     | '/sitemap.xml'
     | '/matches/$id'
@@ -139,6 +151,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
   AwardsRoute: typeof AwardsRoute
+  LiveRoute: typeof LiveRoute
   MatchesRoute: typeof MatchesRouteWithChildren
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   PlayersIdRoute: typeof PlayersIdRoute
@@ -159,6 +172,13 @@ declare module '@tanstack/react-router' {
       path: '/matches'
       fullPath: '/matches'
       preLoaderRoute: typeof MatchesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/live': {
+      id: '/live'
+      path: '/live'
+      fullPath: '/live'
+      preLoaderRoute: typeof LiveRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/awards': {
@@ -230,6 +250,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
   AwardsRoute: AwardsRoute,
+  LiveRoute: LiveRoute,
   MatchesRoute: MatchesRouteWithChildren,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   PlayersIdRoute: PlayersIdRoute,
