@@ -8,6 +8,7 @@ import {
   type Ball, type Player, type Match,
 } from "@/lib/cricket";
 import { ArrowLeft, Camera } from "lucide-react";
+import { fetchAllBalls } from "@/lib/fetch-balls";
 import { useAdmin, AdminLockButton } from "@/lib/admin";
 
 export const Route = createFileRoute("/players/$id")({
