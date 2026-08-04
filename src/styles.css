@@ -112,7 +112,7 @@
   /* Nothing-OS inspired type system */
   --font-dot: "Doto", "Bebas Neue", sans-serif;
   --font-chalk: "JetBrains Mono", ui-monospace, monospace;
-  --font-display: "Doto", "Bebas Neue", sans-serif;
+  --font-display: "JetBrains Mono", ui-monospace, monospace;
   --font-body: "JetBrains Mono", "Barlow", ui-monospace, monospace;
 }
 
@@ -402,13 +402,22 @@
 /* ==================== NOTHING-OS TYPE & LAYOUT ==================== */
 .font-dot {
   font-family: var(--font-dot);
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
 }
-.score-tile,
-.font-display {
+/* Dot-matrix is reserved for numerals only — headings use the mono grotesk */
+.score-tile {
   font-family: var(--font-dot);
-  font-weight: 700;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+}
+.font-display {
+  font-family: var(--font-display);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
 }
 /* Tiny uppercase mono micro-label — the Nothing "system readout" look */
 .n-label {
@@ -464,8 +473,8 @@
   padding: 0 0.4rem;
   border-radius: 9999px;
   font-family: var(--font-dot);
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  font-weight: 500;
+  letter-spacing: 0.01em;
   border: 1px solid color-mix(in oklab, var(--page-color, white) 24%, oklch(0.94 0.03 85 / 0.16));
   background: oklch(0.94 0.03 85 / 0.04);
 }
