@@ -112,7 +112,7 @@
   /* Nothing-OS inspired type system */
   --font-dot: "Doto", "Bebas Neue", sans-serif;
   --font-chalk: "JetBrains Mono", ui-monospace, monospace;
-  --font-display: "JetBrains Mono", ui-monospace, monospace;
+  --font-display: "Doto", "Bebas Neue", sans-serif;
   --font-body: "JetBrains Mono", "Barlow", ui-monospace, monospace;
 }
 
@@ -123,6 +123,11 @@
 @layer base {
   * {
     border-color: var(--color-border);
+  }
+
+  /* Global type scale — everything a notch smaller (medium, not oversized) */
+  html {
+    font-size: 13.5px;
   }
 
   body {
@@ -406,7 +411,7 @@
   letter-spacing: 0.01em;
   font-variant-numeric: tabular-nums;
 }
-/* Dot-matrix is reserved for numerals only — headings use the mono grotesk */
+/* Dot-matrix everywhere, but scaled down a notch — medium, not oversized */
 .score-tile {
   font-family: var(--font-dot);
   font-weight: 500;
@@ -416,8 +421,7 @@
 .font-display {
   font-family: var(--font-display);
   font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.03em;
 }
 /* Tiny uppercase mono micro-label — the Nothing "system readout" look */
 .n-label {
