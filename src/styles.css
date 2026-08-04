@@ -125,6 +125,11 @@
     border-color: var(--color-border);
   }
 
+  /* Global type scale — everything a notch smaller (medium, not oversized) */
+  html {
+    font-size: 13.5px;
+  }
+
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
