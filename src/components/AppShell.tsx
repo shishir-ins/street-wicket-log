@@ -158,8 +158,8 @@ export function AppShell({ children, themeColor }: { children: ReactNode; themeC
             className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-primary text-primary-foreground px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-display tracking-wide hover:opacity-90 transition shadow-[var(--shadow-chalk-glow)]"
           >
             <PlayCircle className="h-4 w-4" />
-            <span className="hidden xs:inline sm:inline">New Match</span>
-            <span className="xs:hidden sm:hidden">New</span>
+            <span className="hidden sm:inline">New Match</span>
+            <span className="sm:hidden">New</span>
           </Link>
         </div>
       </header>
