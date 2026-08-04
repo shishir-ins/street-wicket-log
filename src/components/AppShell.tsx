@@ -18,6 +18,14 @@ const pageColorFor = (path: string): string => {
   return "#22c55e"; // home / green
 };
 
+/** A single deliberate off-hue spark per page — used sparingly for accents. */
+const pageContrastFor = (path: string): string => {
+  if (path.startsWith("/players")) return "#fb923c"; // orange vs sky
+  if (path.startsWith("/matches")) return "#a78bfa"; // violet vs yellow
+  if (path.startsWith("/awards")) return "#5eead4"; // teal vs pink
+  return "#f9a8d4"; // soft pink vs green
+};
+
 const activeIndexFor = (path: string): number => {
   if (path.startsWith("/players")) return 1;
   if (path.startsWith("/matches")) return 2;
@@ -102,16 +110,22 @@ export function AppShell({ children, themeColor }: { children: ReactNode; themeC
   const mobile = usePill(activeIndex, "circle", 46);
 
   return (
-    <div className="min-h-screen flex flex-col page-theme" style={{ ["--page-color" as string]: pageColor }}>
+    <div
+      className="min-h-screen flex flex-col page-theme"
+      style={{
+        ["--page-color" as string]: pageColor,
+        ["--page-contrast" as string]: pageContrastFor(path),
+      }}
+    >
       <header className="sticky top-0 z-30 backdrop-blur-md bg-background/80 border-b border-border">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
+        <div className="max-w-6xl mx-auto px-3 sm:px-6 h-14 sm:h-16 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 md:flex md:justify-between md:gap-3">
           <Link to="/" className="flex items-center gap-2 group">
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-primary/15 text-primary border border-primary/30 font-display text-lg">
+            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary border border-primary/30 font-display text-base">
               B
             </span>
-            <div className="flex flex-col leading-none">
-              <span className="font-display text-xl tracking-widest text-foreground">BELLAMLABIDI</span>
-              <span className="font-chalk text-xs text-muted-foreground -mt-0.5">gully cricket scoreboard</span>
+            <div className="flex min-w-0 flex-col leading-none">
+              <span className="truncate font-display text-base sm:text-xl tracking-widest text-foreground">BELLAMLABIDI</span>
+              <span className="truncate font-chalk text-[0.6rem] sm:text-xs text-muted-foreground -mt-0.5">gully cricket scoreboard</span>
             </div>
           </Link>
           <nav ref={desktop.containerRef} className="hidden md:flex items-center gap-1 relative">
@@ -141,21 +155,22 @@ export function AppShell({ children, themeColor }: { children: ReactNode; themeC
           </nav>
           <Link
             to="/matches/new"
-            className="inline-flex items-center gap-1.5 rounded-md bg-primary text-primary-foreground px-3 py-2 text-sm font-display tracking-wide hover:opacity-90 transition shadow-[var(--shadow-chalk-glow)]"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-primary text-primary-foreground px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-display tracking-wide hover:opacity-90 transition shadow-[var(--shadow-chalk-glow)]"
           >
             <PlayCircle className="h-4 w-4" />
-            New Match
+            <span className="hidden xs:inline sm:inline">New Match</span>
+            <span className="xs:hidden sm:hidden">New</span>
           </Link>
         </div>
       </header>
 
-      <main key={activeIndex} className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 pb-24 md:pb-10 page-enter">
+      <main key={activeIndex} className="flex-1 max-w-6xl w-full mx-auto px-3 sm:px-6 py-4 sm:py-6 pb-28 md:pb-10 page-enter">
         {children}
       </main>
 
       <LiveBar />
 
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-background/90 backdrop-blur border-t border-border">
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-background/90 backdrop-blur border-t border-border pb-[env(safe-area-inset-bottom)]">
         <div ref={mobile.containerRef} className="grid grid-cols-4 max-w-md mx-auto relative">
           <span
             aria-hidden
@@ -175,11 +190,11 @@ export function AppShell({ children, themeColor }: { children: ReactNode; themeC
                 to={it.to}
                 ref={mobile.setItemRef(i)}
                 style={{ ["--tab-color" as string]: it.color }}
-                className="relative z-10 flex flex-col items-center justify-center py-2.5 text-xs text-muted-foreground transition-colors duration-300"
-                activeProps={{ className: "relative z-10 flex flex-col items-center justify-center py-2.5 text-xs text-[var(--tab-color)] transition-colors duration-300" }}
+                className="relative z-10 flex flex-col items-center justify-center py-2 text-[0.65rem] text-muted-foreground transition-colors duration-300"
+                activeProps={{ className: "relative z-10 flex flex-col items-center justify-center py-2 text-[0.65rem] text-[var(--tab-color)] transition-colors duration-300" }}
                 activeOptions={{ exact: it.to === "/" }}
               >
-                <Icon className="h-5 w-5 mb-0.5 transition-transform duration-300" />
+                <Icon className="h-[1.15rem] w-[1.15rem] mb-0.5 transition-transform duration-300" />
                 <span className="font-display tracking-wide">{it.label}</span>
               </Link>
             );
