@@ -18,13 +18,8 @@ const pageColorFor = (path: string): string => {
   return "#22c55e"; // home / green
 };
 
-/** A single deliberate off-hue spark per page — used sparingly for accents. */
-const pageContrastFor = (path: string): string => {
-  if (path.startsWith("/players")) return "#fb923c"; // orange vs sky
-  if (path.startsWith("/matches")) return "#a78bfa"; // violet vs yellow
-  if (path.startsWith("/awards")) return "#5eead4"; // teal vs pink
-  return "#f9a8d4"; // soft pink vs green
-};
+/** One single accent spark, yellow on every page. */
+const CONTRAST = "#facc15";
 
 const activeIndexFor = (path: string): number => {
   if (path.startsWith("/players")) return 1;
@@ -114,7 +109,7 @@ export function AppShell({ children, themeColor }: { children: ReactNode; themeC
       className="min-h-screen flex flex-col page-theme"
       style={{
         ["--page-color" as string]: pageColor,
-        ["--page-contrast" as string]: pageContrastFor(path),
+        ["--page-contrast" as string]: CONTRAST,
       }}
     >
       <header className="sticky top-0 z-30 backdrop-blur-md bg-background/80 border-b border-border">
