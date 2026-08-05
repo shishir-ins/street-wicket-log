@@ -263,6 +263,7 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
       // Compute new state (after this ball)
       const newLegalBalls = totals.legalBalls + (isLegal ? 1 : 0);
       const newWickets = totals.wickets + (payload.isWicket ? 1 : 0);
+      void newWickets;
       const totalRunsThisBall = batRuns + extraRuns;
 
       // Last man standing: only one batsman left — he keeps strike no matter what.
