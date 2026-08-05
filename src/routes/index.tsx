@@ -6,6 +6,7 @@ import type { Match } from "@/lib/cricket";
 import { Flame, Activity, Calendar, Trophy } from "lucide-react";
 import { useAdmin, AdminLockButton } from "@/lib/admin";
 import { PinLiveButton } from "@/components/PinLive";
+import { LiveScoreCard } from "@/components/LiveScoreCard";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -44,35 +45,30 @@ function Dashboard() {
   return (
     <AppShell>
       <section className="mb-6 sm:mb-8">
-        <div className="glass-card p-4 sm:p-10 animate-chalk-in pitch-waves sticker-bat rounded-3xl">
-          <div className="flex flex-wrap items-end justify-between gap-3 sm:gap-4">
+        {liveMatch ? (
+          <LiveScoreCard match={liveMatch} />
+        ) : (
+        <div className="glass-card p-6 sm:p-10 animate-chalk-in pitch-waves sticker-bat rounded-3xl">
+          <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
-              <span className="tape-tag text-[0.65rem] sm:text-sm">EST. 2026</span>
-              <h1 className="mt-2.5 text-2xl sm:text-6xl font-display tracking-widest leading-tight">
+              <span className="tape-tag text-xs sm:text-sm">EST. 2026</span>
+              <h1 className="mt-3 text-4xl sm:text-6xl font-display tracking-widest leading-tight">
                 BELLAMLABIDI<span className="text-primary">.</span>
               </h1>
-              <p className="font-chalk text-xs sm:text-xl mt-1" style={{ color: "var(--chalk-dim)" }}>
+              <p className="font-chalk text-base sm:text-xl mt-1.5" style={{ color: "var(--chalk-dim)" }}>
                 where every gully match becomes history
               </p>
             </div>
-            {liveMatch ? (
-              <Link
-                to="/matches/$id"
-                params={{ id: liveMatch.id }}
-                className="rounded-full bg-destructive text-destructive-foreground px-3.5 py-2 sm:px-4 sm:py-3 font-display tracking-widest text-xs sm:text-sm shadow-[var(--shadow-chalk-glow)] hover:opacity-90"
-              >
-                ● LIVE — {liveMatch.team_a_name} v {liveMatch.team_b_name}
-              </Link>
-            ) : isAdmin ? (
+            {isAdmin ? (
               <Link
                 to="/matches/new"
-                className="rounded-full bg-primary text-primary-foreground px-4 py-2 sm:py-3 font-display tracking-widest text-xs sm:text-sm hover:opacity-90"
+                className="rounded-full bg-primary text-primary-foreground px-5 py-3 font-display tracking-widest text-sm hover:opacity-90"
               >
                 START A MATCH
               </Link>
             ) : (
               <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground font-chalk">viewer mode</span>
+                <span className="text-sm text-muted-foreground font-chalk">viewer mode</span>
                 <AdminLockButton />
               </div>
             )}
@@ -86,9 +82,10 @@ function Dashboard() {
             <PinLiveButton />
           </div>
         </div>
+        )}
       </section>
 
-      <section className="grid grid-cols-3 gap-2 sm:gap-4 mb-6 sm:mb-8">
+      <section className="grid grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-8">
         <StatTile icon={Calendar} label="Today" value={todayCount} suffix="matches" />
         <StatTile icon={Flame} label="This week" value={weekCount} suffix="matches" />
         <StatTile icon={Activity} label="This month" value={monthCount} suffix="matches" />
@@ -148,12 +145,12 @@ function statusBadge(s: string) {
 
 function StatTile({ icon: Icon, label, value, suffix }: { icon: React.ComponentType<{ className?: string }>; label: string; value: number; suffix: string }) {
   return (
-    <div className="chalk-board rounded-2xl p-3 sm:p-5 animate-chalk-in">
-      <div className="flex items-center gap-1.5 text-muted-foreground text-[0.6rem] sm:text-xs font-display tracking-wider">
-        <Icon className="h-3.5 w-3.5 shrink-0 text-accent" />{label.toUpperCase()}
+    <div className="chalk-board rounded-2xl p-4 sm:p-5 animate-chalk-in">
+      <div className="flex items-center gap-1.5 text-muted-foreground text-xs font-display tracking-wider">
+        <Icon className="h-4 w-4 shrink-0 text-accent" />{label.toUpperCase()}
       </div>
-      <div className="score-tile text-3xl sm:text-5xl mt-1.5 text-primary">{value}</div>
-      <div className="text-[0.6rem] sm:text-xs text-muted-foreground mt-1">{suffix}</div>
+      <div className="score-tile text-4xl sm:text-5xl mt-2 text-primary">{value}</div>
+      <div className="text-xs text-muted-foreground mt-1">{suffix}</div>
     </div>
   );
 }
