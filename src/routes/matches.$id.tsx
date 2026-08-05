@@ -263,6 +263,7 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
       // Compute new state (after this ball)
       const newLegalBalls = totals.legalBalls + (isLegal ? 1 : 0);
       const newWickets = totals.wickets + (payload.isWicket ? 1 : 0);
+      void newWickets;
       const totalRunsThisBall = batRuns + extraRuns;
 
       // Last man standing: only one batsman left — he keeps strike no matter what.
@@ -287,7 +288,10 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
       if (payload.isWicket && payload.outPlayerId) outBatsmen.push(payload.outPlayerId);
 
       // Everyone bats: the innings ends only when every batter in the team is out.
-      const battersRemaining = battingTeamSize - newWickets;
+      // Derive from the actual not-out list so a team of N has exactly N wickets,
+      // and the last remaining batter always bats on alone.
+      const notOutIds = battingTeamWithCommon.filter((pid) => !outBatsmen.includes(pid));
+      const battersRemaining = notOutIds.length;
       const allOut = battersRemaining <= 0;
       const oversComplete = newLegalBalls >= totalBalls;
       const chasedDown = innings === 2 && target != null && (totals.runs + totalRunsThisBall) >= target;
@@ -312,7 +316,7 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
         }
         // Exactly one batter left → he bats alone and always keeps strike.
         if (battersRemaining === 1 && !allOut) {
-          const survivor = nextState.strikerId ?? nextState.nonStrikerId ?? null;
+          const survivor = nextState.strikerId ?? nextState.nonStrikerId ?? notOutIds[0] ?? null;
           nextState.strikerId = survivor;
           nextState.nonStrikerId = null;
         }
