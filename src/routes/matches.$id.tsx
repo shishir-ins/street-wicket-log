@@ -15,6 +15,8 @@ import {
 import { useAdmin, AdminLockButton } from "@/lib/admin";
 import { PlayerChip } from "@/components/PlayerChip";
 import { Celebration, type CelebrationKind } from "@/components/Celebration";
+import { MatchTabs } from "@/components/MatchTabs";
+import { MatchInfoPanel } from "@/components/MatchInfoPanel";
 
 export const Route = createFileRoute("/matches/$id")({
   head: () => ({
@@ -523,6 +525,8 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
   const lastManOnly = availableBatsmen.length === 0;
   const needsBatsman = (!state.strikerId || !state.nonStrikerId) && !lastManOnly;
 
+  const [tab, setTab] = useState<"info" | "live" | "card">("live");
+
   useEffect(() => {
     if (!isAdmin || isInningsBreak || !lastManOnly) return;
     if (!state.strikerId && state.nonStrikerId) {
@@ -563,6 +567,20 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
         </div>
       )}
 
+      <MatchTabs
+        items={[{ key: "info", label: "INFO" }, { key: "live", label: "LIVE" }, { key: "card", label: "SCORECARD" }]}
+        value={tab}
+        onChange={(k) => setTab(k as "info" | "live" | "card")}
+      />
+
+      {tab === "info" && (
+        <div className="tab-panel">
+          <MatchInfoPanel match={match} byId={byId} state={state} innings={innings} />
+        </div>
+      )}
+
+      {tab === "live" && (
+      <div className="tab-panel">
       {/* Score header */}
       <div className="chalk-board p-5 sm:p-7 mb-4">
         <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -676,6 +694,17 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
           {recordBall.error ? <p className="text-destructive text-sm mt-2">{(recordBall.error as Error).message}</p> : null}
         </div>
       )}
+      <PartnershipsBlock balls={inningsBalls} innings={innings} byId={byId} />
+      <CommentaryFeed balls={inningsBalls} />
+      </div>
+      )}
+
+      {tab === "card" && (
+        <div className="tab-panel">
+          <InningsTabs match={match} balls={balls} byId={byId} currentInnings={innings} />
+          <ShareToolbar match={match} balls={balls} byId={byId} />
+        </div>
+      )}
 
       {/* In-innings dialogs */}
       {isAdmin && wicketDialog && (
@@ -772,13 +801,6 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
           }}
         />
       )}
-
-      {/* Tabbed scorecards — includes 1st innings when viewing 2nd */}
-      <InningsTabs match={match} balls={balls} byId={byId} currentInnings={innings} />
-
-      <PartnershipsBlock balls={inningsBalls} innings={innings} byId={byId} />
-      <CommentaryFeed balls={inningsBalls} />
-      <ShareToolbar match={match} balls={balls} byId={byId} />
 
       <p className="text-xs text-muted-foreground mt-6">
         Team size: {battingTeamSizeForUI}. {isAdmin ? "Saves automatically with every ball." : "Read-only view."}
@@ -1207,6 +1229,7 @@ function PlayerPick({ label, value, onChange, ids, byId }: { label: string; valu
 // ---------- FINAL SCORECARD ----------
 
 function FinalScorecard({ match, balls, byId }: { match: Match; balls: Ball[]; byId: Record<string, Player> }) {
+  const [tab, setTab] = useState<"info" | "live" | "card">("live");
   const i1 = computeInningsTotals(balls, 1);
   const i2 = computeInningsTotals(balls, 2);
 
@@ -1247,6 +1270,20 @@ function FinalScorecard({ match, balls, byId }: { match: Match; balls: Ball[]; b
       <Link to="/matches" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4">
         <ArrowLeft className="h-4 w-4" /> Matches
       </Link>
+      <MatchTabs
+        items={[{ key: "info", label: "INFO" }, { key: "live", label: "SUMMARY" }, { key: "card", label: "SCORECARD" }]}
+        value={tab}
+        onChange={(k) => setTab(k as "info" | "live" | "card")}
+      />
+
+      {tab === "info" && (
+        <div className="tab-panel">
+          <MatchInfoPanel match={match} byId={byId} state={match.state as unknown as MatchState} innings={2} />
+        </div>
+      )}
+
+      {tab === "live" && (
+      <div className="tab-panel">
       <div className="chalk-board p-6 mb-4">
         <span className="tape-tag text-xs">FULL TIME</span>
         <h1 className="text-3xl sm:text-4xl font-display tracking-widest mt-3">{match.team_a_name} <span className="text-muted-foreground">vs</span> {match.team_b_name}</h1>
@@ -1270,18 +1307,23 @@ function FinalScorecard({ match, balls, byId }: { match: Match; balls: Ball[]; b
         <InningsCard label={`${team1Name} — Innings 1`} totals={i1} overs={match.total_overs} />
         <InningsCard label={`${team2Name} — Innings 2`} totals={i2} overs={match.total_overs} />
       </div>
-
-      <ScorecardBlock title={`${team1Name} batting`} ids={team1Ids} byId={byId} balls={balls.filter((b) => b.innings_number === 1)} mode="bat" />
-      <ScorecardBlock title={`${team2Name} bowling`} ids={team2Ids} byId={byId} balls={balls.filter((b) => b.innings_number === 1)} mode="bowl" />
-      <ScorecardBlock title={`${team2Name} batting`} ids={team2Ids} byId={byId} balls={balls.filter((b) => b.innings_number === 2)} mode="bat" />
-      <ScorecardBlock title={`${team1Name} bowling`} ids={team1Ids} byId={byId} balls={balls.filter((b) => b.innings_number === 2)} mode="bowl" />
-
       <PartnershipsBlock balls={balls.filter((b) => b.innings_number === 1)} innings={1} byId={byId} />
       <PartnershipsBlock balls={balls.filter((b) => b.innings_number === 2)} innings={2} byId={byId} />
       <RunWheel balls={balls.filter((b) => b.innings_number === 1)} title={`${team1Name} run wheel`} />
       <RunWheel balls={balls.filter((b) => b.innings_number === 2)} title={`${team2Name} run wheel`} />
       <CommentaryFeed balls={balls} />
+      </div>
+      )}
+
+      {tab === "card" && (
+      <div className="tab-panel">
+      <ScorecardBlock title={`${team1Name} batting`} ids={team1Ids} byId={byId} balls={balls.filter((b) => b.innings_number === 1)} mode="bat" />
+      <ScorecardBlock title={`${team2Name} bowling`} ids={team2Ids} byId={byId} balls={balls.filter((b) => b.innings_number === 1)} mode="bowl" />
+      <ScorecardBlock title={`${team2Name} batting`} ids={team2Ids} byId={byId} balls={balls.filter((b) => b.innings_number === 2)} mode="bat" />
+      <ScorecardBlock title={`${team1Name} bowling`} ids={team1Ids} byId={byId} balls={balls.filter((b) => b.innings_number === 2)} mode="bowl" />
       <ShareToolbar match={match} balls={balls} byId={byId} />
+      </div>
+      )}
     </AppShell>
   );
 }

@@ -148,6 +148,8 @@ function NewMatch() {
         ballIndex: 0,
         outBatsmen: [],
         target: null,
+        tossWinner,
+        tossDecision,
       };
       const { data, error } = await supabase.from("matches").insert({
         team_a_name: teamAName, team_b_name: teamBName,

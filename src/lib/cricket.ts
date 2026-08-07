@@ -24,6 +24,9 @@ export interface MatchState {
   /** When an innings is declared/forfeited mid-overs, this caps the next innings to the same number of legal balls. */
   inningsBallsCap?: number | null;
   declared?: boolean;
+  /** Toss result recorded at match setup. */
+  tossWinner?: Team | null;
+  tossDecision?: "bat" | "bowl" | null;
 }
 
 export interface InningsTotals {
