@@ -16,6 +16,7 @@ import { useAdmin, AdminLockButton } from "@/lib/admin";
 import { PlayerChip } from "@/components/PlayerChip";
 import { Celebration, type CelebrationKind } from "@/components/Celebration";
 import { MatchTabs } from "@/components/MatchTabs";
+import { MatchInfoPanel } from "@/components/MatchInfoPanel";
 
 export const Route = createFileRoute("/matches/$id")({
   head: () => ({
@@ -574,7 +575,7 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
 
       {tab === "info" && (
         <div className="tab-panel">
-          <InfoPanel match={match} byId={byId} state={state} innings={innings} />
+          <MatchInfoPanel match={match} byId={byId} state={state} innings={innings} />
         </div>
       )}
 
