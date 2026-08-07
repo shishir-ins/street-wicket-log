@@ -13,6 +13,23 @@ export const Route = createFileRoute("/auth")({
   component: AuthPage,
 });
 
+/**
+ * Named accounts can sign in with a username instead of an email.
+ * The username maps to a fixed internal address, and the typed password is
+ * padded to satisfy the minimum password length — invisible to the user.
+ */
+const USERNAME_ACCOUNTS: Record<string, string> = {
+  "bunny admin": "bunny.admin@bellamlabidi.app",
+};
+const PASSWORD_PAD = "-bella";
+
+function resolveCredentials(identifier: string, password: string) {
+  const key = identifier.trim().toLowerCase();
+  const mapped = USERNAME_ACCOUNTS[key];
+  if (mapped) return { email: mapped, password: `${password}${PASSWORD_PAD}` };
+  return { email: identifier.trim(), password };
+}
+
 function AuthPage() {
   const nav = useNavigate();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
