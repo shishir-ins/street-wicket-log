@@ -15,6 +15,7 @@ import {
 import { useAdmin, AdminLockButton } from "@/lib/admin";
 import { PlayerChip } from "@/components/PlayerChip";
 import { Celebration, type CelebrationKind } from "@/components/Celebration";
+import { MatchTabs } from "@/components/MatchTabs";
 
 export const Route = createFileRoute("/matches/$id")({
   head: () => ({
