@@ -523,6 +523,8 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
   const lastManOnly = availableBatsmen.length === 0;
   const needsBatsman = (!state.strikerId || !state.nonStrikerId) && !lastManOnly;
 
+  const [tab, setTab] = useState<"info" | "live" | "card">("live");
+
   useEffect(() => {
     if (!isAdmin || isInningsBreak || !lastManOnly) return;
     if (!state.strikerId && state.nonStrikerId) {
@@ -563,6 +565,20 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
         </div>
       )}
 
+      <MatchTabs
+        items={[{ key: "info", label: "INFO" }, { key: "live", label: "LIVE" }, { key: "card", label: "SCORECARD" }]}
+        value={tab}
+        onChange={(k) => setTab(k as "info" | "live" | "card")}
+      />
+
+      {tab === "info" && (
+        <div className="tab-panel">
+          <InfoPanel match={match} byId={byId} state={state} innings={innings} />
+        </div>
+      )}
+
+      {tab === "live" && (
+      <div className="tab-panel">
       {/* Score header */}
       <div className="chalk-board p-5 sm:p-7 mb-4">
         <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -676,6 +692,17 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
           {recordBall.error ? <p className="text-destructive text-sm mt-2">{(recordBall.error as Error).message}</p> : null}
         </div>
       )}
+      <PartnershipsBlock balls={inningsBalls} innings={innings} byId={byId} />
+      <CommentaryFeed balls={inningsBalls} />
+      </div>
+      )}
+
+      {tab === "card" && (
+        <div className="tab-panel">
+          <InningsTabs match={match} balls={balls} byId={byId} currentInnings={innings} />
+          <ShareToolbar match={match} balls={balls} byId={byId} />
+        </div>
+      )}
 
       {/* In-innings dialogs */}
       {isAdmin && wicketDialog && (
@@ -772,13 +799,6 @@ function LiveScoring({ match, balls, byId, players }: { match: Match; balls: Bal
           }}
         />
       )}
-
-      {/* Tabbed scorecards — includes 1st innings when viewing 2nd */}
-      <InningsTabs match={match} balls={balls} byId={byId} currentInnings={innings} />
-
-      <PartnershipsBlock balls={inningsBalls} innings={innings} byId={byId} />
-      <CommentaryFeed balls={inningsBalls} />
-      <ShareToolbar match={match} balls={balls} byId={byId} />
 
       <p className="text-xs text-muted-foreground mt-6">
         Team size: {battingTeamSizeForUI}. {isAdmin ? "Saves automatically with every ball." : "Read-only view."}
